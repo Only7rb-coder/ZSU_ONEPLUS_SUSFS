@@ -147,6 +147,9 @@ jobs:
     name: "6.1.${{ matrix.sub_level }}-${{ matrix.os_patch_level }}"
     strategy:
       fail-fast: false
+      # Kernel compiles are resource-intensive; cap concurrent runners to keep the
+      # validation matrix reliable on hosted CI capacity.
+      max-parallel: 4
       matrix:
         include: ${{ fromJson(needs['prepare-matrix'].outputs.matrix) }}
     uses: ./.github/workflows/build.yml
