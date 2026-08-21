@@ -62,7 +62,7 @@ jobs:
           fi
 
   deploy-pages:
-    if: ${{ github.repository == 'Only7rb-coder/GKI_ZSU_SUSFS' }}
+    if: ${{ github.repository == 'Only7rb-coder/ZSU_Root_SUSFS' }}
     needs: update-data
     runs-on: ubuntu-latest
     environment:

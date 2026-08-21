@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "rootIntegration": {
+    "repository": "Only7rb-coder/zsu",
+    "ref": "main",
+    "managerPackage": "com.zsu.zsu",
+    "license": "GPL-3.0"
+  },
+  "releasePolicy": {
+    "buildOnly": "Actions",
+    "testRelease": "Pre-Release",
+    "stableRelease": "Release"
+  },
+  "targets": [
+    { "id": "android12-5.10", "android": 12, "kmi": "5.10", "workflow": "kernel-a12-5-10.yml" },
+    { "id": "android13-5.15", "android": 13, "kmi": "5.15", "workflow": "kernel-a13-5-15.yml" },
+    { "id": "android14-6.1", "android": 14, "kmi": "6.1", "workflow": "kernel-a14-6-1.yml" },
+    { "id": "android15-6.6", "android": 15, "kmi": "6.6", "workflow": "kernel-a15-6-6.yml" },
+    { "id": "android16-6.12", "android": 16, "kmi": "6.12", "workflow": "kernel-a16-6-12.yml" }
+  ]
+}

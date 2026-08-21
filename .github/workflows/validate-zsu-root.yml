@@ -1,0 +1,33 @@
+name: Validate ZSU Root Configuration
+
+on:
+  pull_request:
+    paths:
+      - 'config/zsu-root-targets.json'
+      - 'scripts/validate-zsu-root-config.mjs'
+      - '.github/workflows/**'
+  push:
+    branches: [main]
+    paths:
+      - 'config/zsu-root-targets.json'
+      - 'scripts/validate-zsu-root-config.mjs'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate target registry
+        run: node scripts/validate-zsu-root-config.mjs
+      - name: Verify ZSU source declaration
+        run: |
+          grep -Fq 'Only7rb-coder/zsu' .github/workflows/get-manager.yml
+          grep -Fq 'Only7rb-coder/ZSU_Root_SUSFS' .github/workflows/main.yml
