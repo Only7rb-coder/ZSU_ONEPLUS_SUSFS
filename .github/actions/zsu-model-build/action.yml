@@ -1162,6 +1162,25 @@ runs:
           fi
         fi
 
+        # SUSFS open-redirect code targets the newer three-argument
+        # getname_flags() API. Some Android 16 vendor kernels retain the
+        # two-argument declaration, so adapt only when the synced tree
+        # confirms that older signature.
+        fs_header="./include/linux/fs.h"
+        old_getname_flags_call='getname_flags(filename, lookup_flags, NULL);'
+        new_getname_flags_call='getname_flags(filename, lookup_flags);'
+        if grep -Eq 'extern struct filename \*getname_flags\(const char __user \*, int\);' "$fs_header"; then
+          getname_flags_compat_count=$(grep -FRc --include='*.c' "$old_getname_flags_call" ./fs || true)
+          if [ "$getname_flags_compat_count" -gt 0 ]; then
+            sed -i "s|$old_getname_flags_call|$new_getname_flags_call|g" ./fs/*.c
+            if grep -FRq --include='*.c' "$old_getname_flags_call" ./fs; then
+              echo "::error::Failed to adapt SUSFS getname_flags() calls"
+              exit 1
+            fi
+            echo "Adjusted $getname_flags_compat_count SUSFS getname_flags() call(s) for the two-argument kernel API"
+          fi
+        fi
+
         if [ "${{ env.ANDROID_VER }}" = "android15" ] && [ "${{ env.KERNEL_VER }}" = "6.6" ] && [ "$had_fold_filemap_fixup" -eq 0 ]; then
           fold_filemap_compat_count=$(grep -Fc '__fold_filemap_fixup_entry' ./fs/proc/task_mmu.c || true)
           if [ "$fold_filemap_compat_count" -gt 0 ]; then

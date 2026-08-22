@@ -16,3 +16,4 @@
 - [x] Install `libdw-dev` for Android 16 / 6.12 builds so `gendwarfksyms` can find the required `dwarf.h` host header.
 - [x] Show every model's complete detected kernel version across all supported tracks in workflow-job and release-facing labels instead of the shortened Android/KMI label.
 - [ ] Run the corrected Android 16 / Linux 6.12 model group before retrying the full 158-model release.
+- [x] Adapt Android 16 / Linux 6.12 SUSFS `getname_flags()` calls to each synced vendor tree's two-argument API before compiling the targeted group again.
