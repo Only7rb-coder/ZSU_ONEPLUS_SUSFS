@@ -947,6 +947,7 @@ runs:
 
         echo "NEED_HOOKS=false" >> "$GITHUB_ENV"
         echo "KSU_COMMIT_SHA=$KSU_COMMIT_SHA" >> "$GITHUB_ENV"
+        echo "ZSU_KERNEL_FOLDER=$ZSU_KERNEL_DIR" >> "$GITHUB_ENV"
         echo "ZSU" >> "${ARTIFACTS_FOLDER}/${OP_MODEL}_${OP_OS_VERSION}.txt"
         echo "$KSU_VERSION" >> "${ARTIFACTS_FOLDER}/${OP_MODEL}_${OP_OS_VERSION}.txt"
         echo "KSUVER=$KSU_VERSION" >> "$GITHUB_ENV"
@@ -1963,7 +1964,18 @@ runs:
         set -euo pipefail
         echo "::group::Resolve KSU Symbol Dependencies"
         echo "Injecting fallback weak symbol into KernelSU resolver..."
-        RESOLVER=$(find "$KSU_FOLDER" -name "symbol_resolver.c" | head -n 1)
+        ROOT_SOURCE_FOLDER="$KSU_FOLDER"
+        if [ "${{ inputs.ksu_type }}" = "ZSU" ]; then
+          ROOT_SOURCE_FOLDER="${ZSU_KERNEL_FOLDER:-$KERNEL_PLATFORM_FOLDER/KernelSU-Next}"
+        fi
+
+        if [ ! -d "$ROOT_SOURCE_FOLDER" ]; then
+          echo "::warning::Root source tree not found at $ROOT_SOURCE_FOLDER; skipping optional weak-symbol injection."
+          echo "::endgroup::"
+          exit 0
+        fi
+
+        RESOLVER=$(find "$ROOT_SOURCE_FOLDER" -name "symbol_resolver.c" -print -quit)
         if [ -n "$RESOLVER" ]; then
           if ! grep -q "__weak kallsyms_on_each_symbol" "$RESOLVER"; then
             KERNEL_VER="${{ env.KERNEL_VER }}"
