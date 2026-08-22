@@ -8,7 +8,7 @@
 # 4. 创建 GitHub Release (可选)
 # ========================================
 
-name: 构建内核
+name: Build and Release ONEPLUS ZSU Kernels
 
 # 适配 Node.js 24
 env:
@@ -315,7 +315,7 @@ jobs:
             echo "BRANCH_INFO=稳定版" >> $GITHUB_ENV
           fi
 
-          echo "RELEASE_NAME=GKI内核: ${KSU_NAME}(${KSU_VER}) & SUSFS ${SUS_VER}" >> $GITHUB_ENV
+          echo "RELEASE_NAME=ONEPLUS GKI Kernels with ${KSU_NAME} & SUSFS ${SUS_VER}" >> $GITHUB_ENV
 
       - name: 验证构建状态
         run: |
@@ -397,7 +397,15 @@ jobs:
       - name: 生成发布说明
         run: |
           cat > release_body.md << EOF
-          ## 📦 本次发布内容 / Release Contents
+          # 🎯 ONEPLUS GKI Kernels with ZSU & SUSFS ${{ env.SUS_VER }}
+
+          > **Build Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          > **Build ID:** \`${{ github.run_id }}\`
+          > **Workflow:** [\`${{ github.workflow }}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          ---
+
+          ## 🔧 Build Configuration
 
           **${{ env.KSU_NAME }}** + **SUSFS ${{ env.SUS_VER }}**${{ env.LZ4_SUFFIX }}
 
@@ -416,9 +424,10 @@ jobs:
 
           > 💡 [Unicode 零宽绕过修复](https://t.me/real5ec1cff/268) - 请使用 Xposed 模块
 
-          ### 📥 推荐模块 / Recommended Module
+          ### 📥 Manager and Required Module
 
-          - https://github.com/sidex15/ksu_module_susfs
+          - **ZSU Manager**: included in the release assets when the selected build uploads it.
+          - **SUSFS module**: included in the release assets when the selected build uploads it.
 
           ---
 
@@ -493,27 +502,72 @@ jobs:
         run: |
           SUS_VERSION="${{ needs.get-manager.outputs.susVer }}"
           if [ -z "$SUS_VERSION" ]; then
-            echo "警告: 未获取到 SUSFS 版本，使用默认版本号"
-            SUS_VERSION="1.0.0"
+            echo "::error::Unable to determine the SUSFS version; refusing to create an ambiguous release tag."
+            exit 1
           fi
 
-          LATEST_TAG=$(gh api repos/$REPO_OWNER/$REPO_NAME/tags --jq '.[0].name' 2>/dev/null | sed 's/-.*//' || echo "")
+          LATEST_MATCHING_TAG=$(gh api repos/$REPO_OWNER/$REPO_NAME/tags \
+            --jq "[.[] | select(.name | startswith(\"${SUS_VERSION}-r\")) | .name] | sort_by(split(\"-r\")[1] | tonumber) | last // empty")
 
-          if [ "$SUS_VERSION" = "$LATEST_TAG" ]; then
-            LATEST_TAG=$(gh api repos/$REPO_OWNER/$REPO_NAME/tags --jq '.[0].name')
+          if [ -z "$LATEST_MATCHING_TAG" ]; then
+            NEW_TAG="${SUS_VERSION}-r1"
           else
-            LATEST_TAG="$SUS_VERSION-r0"
+            NEW_TAG=$(echo "$LATEST_MATCHING_TAG" | awk -F'-r' '{printf "%s-r%d", $1, $2+1}')
           fi
 
-          NEW_TAG=$(echo "$LATEST_TAG" | awk -F'-r' '{suffix=$2; if (!suffix) suffix=0; suffix++; printf "%s-r%d", $1, suffix}')
           echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
-
-          echo "生成标签: $NEW_TAG"
+          echo "Generated release tag: $NEW_TAG"
 
       - name: 下载构建产物
         uses: actions/download-artifact@v8
         with:
           path: ./downloaded-artifacts
+
+      - name: 准备发布资产和清单
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+
+          find ./downloaded-artifacts -type f \
+            \( -name "*.apk" -o -name "*.zip" -o -name "*.img" -o -name "*.ko" \) \
+            ! -path "*-Rejects/*" -print0 | \
+          while IFS= read -r -d '' file; do
+            cp -f "$file" "release-assets/$(basename "$file")"
+          done
+
+          mapfile -t ASSETS < <(find release-assets -maxdepth 1 -type f -printf '%p\n' | sort)
+          if [ "${#ASSETS[@]}" -eq 0 ]; then
+            echo "::error::No release assets were produced by the selected build."
+            exit 1
+          fi
+
+          {
+            echo ""
+            echo "---"
+            echo ""
+            echo "## 📦 Release Assets (${#ASSETS[@]} total)"
+            echo ""
+            echo "| Asset | Type | Size | SHA-256 |"
+            echo "|---|---|---:|---|"
+
+            for file in "${ASSETS[@]}"; do
+              name=$(basename "$file")
+              encoded_name=$(printf '%s' "$name" | sed 's/ /%20/g')
+              size_bytes=$(stat -c%s "$file")
+              size_mib=$(awk "BEGIN { printf \"%.2f\", $size_bytes / 1048576 }")
+              sha256=$(sha256sum "$file" | awk '{print $1}')
+              case "$name" in
+                *AnyKernel3.zip|AK3_*.zip) asset_type="AnyKernel3 kernel package" ;;
+                *.apk) asset_type="ZSU manager APK" ;;
+                *.img) asset_type="Kernel image" ;;
+                *.ko) asset_type="Kernel module" ;;
+                *.zip) asset_type="SUSFS module or support package" ;;
+                *) asset_type="Build artifact" ;;
+              esac
+              printf '| [%s](https://github.com/%s/%s/releases/download/%s/%s) | %s | %s MiB | `%s` |\n' \
+                "$name" "$REPO_OWNER" "$REPO_NAME" "$NEW_TAG" "$encoded_name" "$asset_type" "$size_mib" "$sha256"
+            done
+          } >> release_body.md
 
       - name: 创建 GitHub Release 草稿
         run: |
@@ -532,22 +586,8 @@ jobs:
       - name: 上传全部发布资产
         run: |
           set -euo pipefail
-          echo "准备上传内核、AnyKernel、ZSU 管理器和 SUSFS 模块..."
-          mkdir -p release-assets
-          find ./downloaded-artifacts -type f \
-            \( -name "*.apk" -o -name "*.zip" -o -name "*.img" -o -name "*.ko" \) \
-            ! -path "*-Rejects/*" -print0 | \
-          while IFS= read -r -d '' file; do
-            cp -f "$file" "release-assets/$(basename "$file")"
-          done
-
           mapfile -t ASSETS < <(find release-assets -maxdepth 1 -type f -printf '%p\n' | sort)
-          if [ "${#ASSETS[@]}" -eq 0 ]; then
-            echo "::error::没有找到可上传的发布资产"
-            exit 1
-          fi
-
-          printf '将上传以下资产:\n'
+          printf 'Uploading release assets:\n'
           printf ' - %s\n' "${ASSETS[@]}"
           for file in "${ASSETS[@]}"; do
             gh release upload "$NEW_TAG" "$file" --clobber
@@ -560,10 +600,16 @@ jobs:
 
       - name: 构建摘要
         run: |
-          echo "## 发布已创建" >> $GITHUB_STEP_SUMMARY
-          echo "- **标签**: $NEW_TAG" >> $GITHUB_STEP_SUMMARY
-          echo "- **类型**: ${{ inputs.release_type }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **链接**: https://github.com/$REPO_OWNER/$REPO_NAME/releases/tag/$NEW_TAG" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Release Created"
+            echo ""
+            echo "- **Tag**: [$NEW_TAG](https://github.com/$REPO_OWNER/$REPO_NAME/releases/tag/$NEW_TAG)"
+            echo "- **Type**: ${{ inputs.release_type }}"
+            echo "- **Assets**: $(find release-assets -maxdepth 1 -type f | wc -l)"
+            echo ""
+            echo "### Published files"
+            find release-assets -maxdepth 1 -type f -printf '%f\n' | sort | sed 's/^/- `/' | sed 's/$/`/'
+          } >> $GITHUB_STEP_SUMMARY
 
       - name: 发送 Telegram 频道通知
         env:
