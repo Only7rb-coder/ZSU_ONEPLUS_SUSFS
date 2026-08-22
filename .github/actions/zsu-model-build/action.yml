@@ -940,6 +940,27 @@ runs:
           exit 1
         fi
 
+        # KernelSU-Next exposes its UAPI directory through a relative link at
+        # kernel/include/uapi. Verify that the linked header is reachable in
+        # the synced tree, and restore the repository's canonical link only
+        # if an extraction or source-layout edge case left it unresolved.
+        ZSU_UAPI_SOURCE="$ZSU_KERNEL_DIR/uapi"
+        ZSU_UAPI_LINK="$ZSU_KERNEL_DIR/kernel/include/uapi"
+        if [ ! -f "$ZSU_UAPI_SOURCE/app_profile.h" ]; then
+          echo "::error::KernelSU-Next UAPI source is missing app_profile.h: $ZSU_UAPI_SOURCE/app_profile.h"
+          exit 1
+        fi
+        if [ ! -f "$ZSU_UAPI_LINK/app_profile.h" ]; then
+          if [ -e "$ZSU_UAPI_LINK" ] && [ ! -L "$ZSU_UAPI_LINK" ]; then
+            echo "::error::KernelSU-Next UAPI path is not a repairable symlink: $ZSU_UAPI_LINK"
+            exit 1
+          fi
+          rm -f "$ZSU_UAPI_LINK"
+          ln -s ../../uapi "$ZSU_UAPI_LINK"
+          echo "Repaired KernelSU-Next kernel/include/uapi link"
+        fi
+        test -f "$ZSU_UAPI_LINK/app_profile.h"
+
         # Android 15 / 6.6 vendor SELinux call sites used by HMBIRD need these
         # KernelSU-Next policy helpers to have external linkage. KernelSU-Next
         # declares the forward prototypes as static even though the matching

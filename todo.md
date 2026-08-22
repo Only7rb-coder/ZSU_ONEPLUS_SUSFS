@@ -18,3 +18,4 @@
 - [ ] Run the corrected Android 16 / Linux 6.12 model group before retrying the full 158-model release.
 - [x] Adapt Android 16 / Linux 6.12 SUSFS `getname_flags()` calls to each synced vendor tree's two-argument API before compiling the targeted group again.
 - [x] Correct the Android 16 `getname_flags()` compatibility implementation so it updates every matching SUSFS source file and verifies the replacement.
+- [x] Verify and repair the ZSU linked `kernel/include/uapi` path when an Android 16 source tree cannot resolve `app_profile.h` during compilation.
