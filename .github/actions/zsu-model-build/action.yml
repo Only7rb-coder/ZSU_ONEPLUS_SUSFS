@@ -961,6 +961,15 @@ runs:
         fi
         test -f "$ZSU_UAPI_LINK/app_profile.h"
 
+        # ccflags-y applies to the immediate KernelSU object only. Nested
+        # KernelSU sources also include headers from the repository root and
+        # include/ directory, so propagate those paths through subdirectory
+        # builds as well.
+        if ! grep -qxF 'subdir-ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include' "$ZSU_KBUILD"; then
+          printf '\nsubdir-ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include\n' >> "$ZSU_KBUILD"
+        fi
+        grep -qxF 'subdir-ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include' "$ZSU_KBUILD"
+
         # Android 15 / 6.6 vendor SELinux call sites used by HMBIRD need these
         # KernelSU-Next policy helpers to have external linkage. KernelSU-Next
         # declares the forward prototypes as static even though the matching
