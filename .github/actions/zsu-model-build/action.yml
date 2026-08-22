@@ -112,6 +112,21 @@ runs:
         echo "Parsed config:"
         jq '.' /tmp/config.json
 
+    - name: Initialize model build cache
+      shell: bash
+      run: |
+        set -euo pipefail
+        cache_dir="$GITHUB_WORKSPACE/.cache/ccache"
+        mkdir -p "$cache_dir"
+        {
+          echo "CCACHE_DIR=$cache_dir"
+          echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE"
+          echo "CCACHE_MAXSIZE=5G"
+          echo "CCACHE_COMPRESS=true"
+          echo "CCACHE_COMPRESSLEVEL=3"
+          echo "CCACHE_LOGFILE=$cache_dir/ccache.log"
+        } >> "$GITHUB_ENV"
+
     - name: Validate Inputs
       shell: bash
       run: |
