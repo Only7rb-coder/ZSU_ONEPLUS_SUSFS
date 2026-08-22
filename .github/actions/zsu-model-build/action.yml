@@ -970,12 +970,12 @@ runs:
         fi
         grep -qxF 'subdir-ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include' "$ZSU_KBUILD"
 
-        # Android 15 / 6.6 vendor SELinux call sites used by HMBIRD need these
+        # Android 15 / 6.6 and Android 16 / 6.12 HMBIRD call sites need these
         # KernelSU-Next policy helpers to have external linkage. KernelSU-Next
         # declares the forward prototypes as static even though the matching
         # definitions are later compiled into the kernelsu object, which leaves
         # the symbols unavailable to vmlinux at final link time.
-        if [ "${{ env.ANDROID_VER }}" = "android15" ] && [ "${{ env.KERNEL_VER }}" = "6.6" ]; then
+        if { [ "${{ env.ANDROID_VER }}" = "android15" ] && [ "${{ env.KERNEL_VER }}" = "6.6" ]; } || { [ "${{ env.ANDROID_VER }}" = "android16" ] && [ "${{ env.KERNEL_VER }}" = "6.12" ]; }; then
           SELINUX_HIDE="$ZSU_KERNEL_DIR/kernel/feature/selinux_hide.c"
           if [ ! -f "$SELINUX_HIDE" ]; then
             echo "::error::KernelSU-Next SELinux helper source is missing: $SELINUX_HIDE"
@@ -990,7 +990,7 @@ runs:
             echo "::error::KernelSU-Next SELinux policy helpers still have internal linkage"
             exit 1
           fi
-          echo "✅ Exposed KernelSU-Next Android 15 / 6.6 SELinux policy helpers for HMBIRD linking"
+          echo "✅ Exposed KernelSU-Next SELinux policy helpers for HMBIRD linking"
         fi
 
         KSU_COMMIT_SHA=$(git -C "$ZSU_KERNEL_DIR" rev-parse HEAD)

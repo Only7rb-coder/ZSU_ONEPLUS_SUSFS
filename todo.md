@@ -21,3 +21,4 @@
 - [x] Verify and repair the ZSU linked `kernel/include/uapi` path when an Android 16 source tree cannot resolve `app_profile.h` during compilation.
 - [x] Propagate KernelSU-Next include paths to nested sources so Android 16 builds resolve `uapi/app_profile.h` and `klog.h` consistently.
 - [x] Pass the verified KernelSU-Next root and include paths through the build-wide preprocessor flags for every Android 16 compilation unit.
+- [x] Expose the KernelSU-Next SELinux policy helper symbols required by Android 16 / Linux 6.12 HMBIRD final linking.
