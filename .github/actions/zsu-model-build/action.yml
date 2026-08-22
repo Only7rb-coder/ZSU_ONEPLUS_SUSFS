@@ -2285,8 +2285,11 @@ runs:
         # Remove empty layout subdirectories
         find "$CCACHE_DIR" -type d -empty -delete
 
-        cp "${{ env.CCACHE_LOGFILE }}" "$CCACHE_DIR"
-        
+        CACHED_LOG_PATH="$CCACHE_DIR/ccache.log"
+        if [ -f "${{ env.CCACHE_LOGFILE }}" ] && [ "$(readlink -f "${{ env.CCACHE_LOGFILE }}")" != "$(readlink -f "$CACHED_LOG_PATH")" ]; then
+          cp "${{ env.CCACHE_LOGFILE }}" "$CACHED_LOG_PATH"
+        fi
+
         if [ "${{ inputs.debug }}" == "true" ]; then
           if [ -f "${{ env.CCACHE_LOGFILE }}" ]; then
             echo "Rename ccache log"
