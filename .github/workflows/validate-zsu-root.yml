@@ -1,17 +1,25 @@
-name: Validate ZSU Root Configuration
+name: Validate ZSU ONEPLUS Configuration
 
 on:
   pull_request:
     paths:
       - 'config/zsu-root-targets.json'
       - 'scripts/validate-zsu-root-config.mjs'
+      - 'configs/**'
+      - 'manifests/**'
+      - 'scripts/validate-zsu-model-config.mjs'
       - '.github/workflows/**'
+      - '.github/actions/**'
   push:
     branches: [main]
     paths:
       - 'config/zsu-root-targets.json'
       - 'scripts/validate-zsu-root-config.mjs'
+      - 'configs/**'
+      - 'manifests/**'
+      - 'scripts/validate-zsu-model-config.mjs'
       - '.github/workflows/**'
+      - '.github/actions/**'
   workflow_dispatch:
 
 permissions:
@@ -27,7 +35,11 @@ jobs:
           node-version: '22'
       - name: Validate target registry
         run: node scripts/validate-zsu-root-config.mjs
+      - name: Validate model registry and manifests
+        run: node scripts/validate-zsu-model-config.mjs
       - name: Verify ZSU source declaration
         run: |
           grep -Fiq 'Only7rb-coder/zsu' .github/workflows/get-manager.yml
           grep -Fq 'Only7rb-coder/ZSU_ONEPLUS_SUSFS' .github/workflows/main.yml
+          grep -Fq 'ksu_type: ZSU' .github/workflows/zsu-model-release.yml
+          test -f .github/actions/zsu-model-build/action.yml

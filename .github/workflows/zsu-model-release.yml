@@ -1,0 +1,392 @@
+name: Build and Release ZSU ONEPLUS Kernels
+
+permissions:
+  contents: write
+  actions: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Choose build-only, test, or stable release mode'
+        required: true
+        type: choice
+        options:
+          - Actions
+          - Pre-Release
+          - Release
+        default: Actions
+      model_scope:
+        description: 'Choose which model configurations to build'
+        required: true
+        type: choice
+        options:
+          - OOS14+15+16
+          - OOS15+16
+          - OOS14+15
+          - OOS16
+          - OOS15
+          - OOS14
+          - android16-6.12
+          - android15-6.6
+          - android14-6.1
+          - android13-5.15
+          - android12-5.10
+        default: OOS14+15+16
+      config_path:
+        description: 'Optional exact model configuration for validation, for example configs/oos16/OP15.json'
+        required: false
+        type: string
+        default: ''
+      zsu_branch:
+        description: 'ZSU KernelSU Next integration branch or commit'
+        required: false
+        type: string
+        default: dev-susfs
+      optimize_level:
+        description: 'Compiler optimization level'
+        required: true
+        type: choice
+        options: [O2, O3]
+        default: O2
+      clean_build:
+        description: 'Disable compiler cache for a clean build'
+        required: false
+        type: boolean
+        default: false
+      debug:
+        description: 'Upload additional debug artifacts'
+        required: false
+        type: boolean
+        default: false
+      build_timestamp:
+        description: 'Optional kernel build timestamp; leave empty for current UTC time'
+        required: false
+        type: string
+        default: ''
+      android12_5_10_susfs_ref:
+        description: 'Optional SUSFS branch or commit for android12-5.10'
+        required: false
+        type: string
+        default: ''
+      android13_5_15_susfs_ref:
+        description: 'Optional SUSFS branch or commit for android13-5.15'
+        required: false
+        type: string
+        default: ''
+      android14_6_1_susfs_ref:
+        description: 'Optional SUSFS branch or commit for android14-6.1'
+        required: false
+        type: string
+        default: ''
+      android15_6_6_susfs_ref:
+        description: 'Optional SUSFS branch or commit for android15-6.6'
+        required: false
+        type: string
+        default: ''
+      android16_6_12_susfs_ref:
+        description: 'Optional SUSFS branch or commit for android16-6.12'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  get-zsu-manager:
+    uses: ./.github/workflows/get-manager.yml
+
+  plan-model-build:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      count: ${{ steps.plan.outputs.count }}
+      zsu_commit: ${{ steps.plan.outputs.zsu_commit }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            configs/
+          sparse-checkout-cone-mode: false
+      - id: plan
+        name: Create model build matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          scope="${{ inputs.model_scope }}"
+          config_path="${{ inputs.config_path }}"
+
+          if [ -n "$config_path" ]; then
+            if [[ "$config_path" != configs/*.json || "$config_path" == *".."* || ! -f "$config_path" ]]; then
+              echo "::error::config_path must be an existing configs/*.json file"
+              exit 1
+            fi
+            jq -s '.' "$config_path" > source-models.json
+          else
+            find configs -type f -name '*.json' -print0 | sort -z | xargs -0 jq -s '.' > source-models.json
+          fi
+
+          filter='.'
+          case "$scope" in
+            OOS14+15+16) ;;
+            OOS15+16) filter='map(select(.os_version == "OOS15" or .os_version == "OOS16"))' ;;
+            OOS14+15) filter='map(select(.os_version == "OOS14" or .os_version == "OOS15"))' ;;
+            OOS16|OOS15|OOS14) filter="map(select(.os_version == \"$scope\"))" ;;
+            android*-*.*)
+              android="${scope%%-*}"
+              kernel="${scope#*-}"
+              filter="map(select(.android_version == \"$android\" and .kernel_version == \"$kernel\"))"
+              ;;
+            *)
+              echo "::error::Unknown model scope: $scope"
+              exit 1
+              ;;
+          esac
+
+          selected=$(jq -c "$filter | sort_by(.os_version, .model)" source-models.json)
+          count=$(jq 'length' <<<"$selected")
+          if [ "$count" -eq 0 ]; then
+            echo "::error::No model configurations match the requested selection"
+            exit 1
+          fi
+
+          matrix=$(jq -c '{include: .}' <<<"$selected")
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$selected" > model-build-matrix.json
+
+          zsu_ref="${{ inputs.zsu_branch }}"
+          zsu_commit=$(git ls-remote https://github.com/pershoot/KernelSU-Next.git "$zsu_ref" "refs/heads/$zsu_ref" "refs/tags/$zsu_ref" | awk 'NR==1 {print $1}')
+          if [ -z "$zsu_commit" ] && [[ "$zsu_ref" =~ ^[0-9a-f]{40}$ ]]; then
+            zsu_commit="$zsu_ref"
+          fi
+          if [ -z "$zsu_commit" ]; then
+            echo "::error::Unable to resolve ZSU integration ref: $zsu_ref"
+            exit 1
+          fi
+          echo "zsu_commit=$zsu_commit" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## ZSU ONEPLUS Model Build Plan"
+            echo ""
+            echo "- **Mode**: ${{ inputs.release_type }}"
+            echo "- **Scope**: $scope"
+            echo "- **Selected models**: $count"
+            echo "- **ZSU integration**: \`$zsu_ref\` (\`${zsu_commit:0:12}\`)"
+            echo ""
+            echo "| Model | OS | Android / Kernel | Manifest |"
+            echo "|---|---|---|---|"
+            jq -r '.[] | "| \(.model) | \(.os_version) | \(.android_version)-\(.kernel_version) | \(.manifest) |"' <<<"$selected"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload model build matrix
+        uses: actions/upload-artifact@v7
+        with:
+          name: model-build-matrix
+          path: model-build-matrix.json
+          archive: false
+          retention-days: 30
+
+  build-models:
+    needs: plan-model-build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.plan-model-build.outputs.matrix) }}
+    name: build (${{ matrix.model }}, ${{ matrix.os_version }}, ${{ matrix.android_version }}-${{ matrix.kernel_version }})
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - name: Free runner disk space
+        if: ${{ matrix.disk_cleanup }}
+        uses: ./.github/actions/zsu-disk-cleanup
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            aria2 bc bison build-essential ccache clang curl dwarves file flex git jq \
+            libelf-dev libncurses-dev libssl-dev libxml2-utils lz4 pigz python3 \
+            rsync unzip wget zip zlib1g-dev
+          sudo apt-get clean
+      - id: select-susfs
+        name: Select SUSFS ref for model track
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ matrix.android_version }}-${{ matrix.kernel_version }}" in
+            android12-5.10) value="${{ inputs.android12_5_10_susfs_ref }}" ;;
+            android13-5.15) value="${{ inputs.android13_5_15_susfs_ref }}" ;;
+            android14-6.1) value="${{ inputs.android14_6_1_susfs_ref }}" ;;
+            android15-6.6) value="${{ inputs.android15_6_6_susfs_ref }}" ;;
+            android16-6.12) value="${{ inputs.android16_6_12_susfs_ref }}" ;;
+            *) echo "::error::Unsupported model track"; exit 1 ;;
+          esac
+          echo "value=$value" >> "$GITHUB_OUTPUT"
+      - id: build
+        name: Build model-named ZSU kernel package
+        uses: ./.github/actions/zsu-model-build
+        with:
+          op_config_json: ${{ toJSON(matrix) }}
+          ksu_type: ZSU
+          ksu_branch_or_hash: ${{ inputs.zsu_branch }}
+          susfs_commit_hash_or_branch: ${{ steps.select-susfs.outputs.value }}
+          optimize_level: ${{ inputs.optimize_level }}
+          build_timestamp: ${{ inputs.build_timestamp }}
+          clean: ${{ inputs.clean_build }}
+          debug: ${{ inputs.debug }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-model-release:
+    needs: [get-zsu-manager, plan-model-build, build-models]
+    if: ${{ always() && !cancelled() && inputs.release_type != 'Actions' && needs.get-zsu-manager.result == 'success' && needs.plan-model-build.result == 'success' && needs.build-models.result == 'success' }}
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO_OWNER: ${{ github.repository_owner }}
+      REPO_NAME: ${{ github.event.repository.name }}
+      SUSFS_VERSION: ${{ needs.get-zsu-manager.outputs.susVer }}
+      ZSU_MANAGER_VERSION: ${{ needs.get-zsu-manager.outputs.ksuVer }}
+      ZSU_COMMIT: ${{ needs.plan-model-build.outputs.zsu_commit }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Generate next SUSFS release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$SUSFS_VERSION" ]; then
+            echo "::error::The ZSU manager workflow did not return a SUSFS version"
+            exit 1
+          fi
+          latest=$(gh api "repos/$REPO_OWNER/$REPO_NAME/tags" --paginate --jq "[.[] | select(.name | startswith(\"${SUSFS_VERSION}-r\")) | .name] | sort_by(split(\"-r\")[1] | tonumber) | last // empty")
+          if [ -z "$latest" ]; then
+            tag="${SUSFS_VERSION}-r1"
+          else
+            tag=$(awk -F'-r' '{printf "%s-r%d", $1, $2 + 1}' <<<"$latest")
+          fi
+          echo "NEW_TAG=$tag" >> "$GITHUB_ENV"
+      - name: Download all model and ZSU artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: downloaded-artifacts
+          merge-multiple: true
+      - name: Build release notes and asset manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          cd downloaded-artifacts
+          mapfile -t KERNEL_ZIPS < <(find . -maxdepth 1 -type f -name 'AK3_*.zip' -printf '%f\n' | sort)
+          mapfile -t NORMAL_APKS < <(find . -maxdepth 1 -type f -name '*.apk' ! -name '*spoofed*' -printf '%f\n' | sort)
+          mapfile -t SPOOFED_APKS < <(find . -maxdepth 1 -type f -name '*spoofed*.apk' -printf '%f\n' | sort)
+          if [ "${#KERNEL_ZIPS[@]}" -eq 0 ]; then
+            echo "::error::No model-named AnyKernel packages were produced"
+            exit 1
+          fi
+          if [ "${#NORMAL_APKS[@]}" -eq 0 ] || [ "${#SPOOFED_APKS[@]}" -eq 0 ]; then
+            echo "::error::Both normal and spoofed ZSU manager APKs are required for a model release"
+            exit 1
+          fi
+
+          {
+            echo "# 🎯 ONEPLUS Kernels with ZSU & SUSFS $SUSFS_VERSION"
+            echo
+            echo "> **Build Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "> **Build ID:** \`${{ github.run_id }}\`"
+            echo "> **Workflow:** [\`${{ github.workflow }}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo
+            echo "---"
+            echo
+            echo "## 📦 Built Models (${#KERNEL_ZIPS[@]} total)"
+            echo
+            echo "| Model | OS Version | Kernel Version | Package |"
+            echo "|---|---|---|---|"
+            for zip in "${KERNEL_ZIPS[@]}"; do
+              stem="${zip%.zip}"
+              IFS='_' read -r prefix model os kernel root root_version susfs_label susfs_version <<<"$stem"
+              url="https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/$NEW_TAG/$zip"
+              printf '| %s | %s | %s | [%s](%s) |\n' "$model" "$os" "$kernel" "$zip" "$url"
+            done
+            echo
+            echo "---"
+            echo
+            echo "## 🔧 ZSU Build Configuration"
+            echo
+            echo "| Component | Version / Setting |"
+            echo "|---|---|"
+            echo "| **Root integration** | ZSU (KernelSU Next SUSFS base) |"
+            echo "| **ZSU manager** | \`$ZSU_MANAGER_VERSION\` |"
+            echo "| **ZSU integration commit** | [\`${ZSU_COMMIT:0:12}\`](https://github.com/pershoot/KernelSU-Next/commit/$ZSU_COMMIT) |"
+            echo "| **SUSFS** | \`$SUSFS_VERSION\` |"
+            echo "| **Optimization** | ${{ inputs.optimize_level }} |"
+            echo "| **Clean build** | ${{ inputs.clean_build }} |"
+            echo
+            echo "## 📱 ZSU Manager"
+            echo
+            echo "Both normal and spoofed ZSU manager APKs are attached to this release."
+            echo
+            echo "## 📥 Installation"
+            echo
+            echo "1. Download the package whose **model name** and OS version match your device configuration."
+            echo "2. Back up the current boot image before flashing."
+            echo "3. Flash the selected AnyKernel package with a compatible kernel flasher."
+            echo "4. Reboot and use the attached ZSU manager APK."
+            echo
+            echo "---"
+            echo
+            echo "## 🔐 Release Asset Checksums"
+            echo
+            echo "| Asset | Type | Size | SHA-256 |"
+            echo "|---|---|---:|---|"
+          } > ../release-notes.md
+
+          mapfile -t ASSETS < <(find . -maxdepth 1 -type f \( -name '*.zip' -o -name '*.apk' -o -name '*.img' -o -name '*.ko' \) -printf '%f\n' | sort)
+          for name in "${ASSETS[@]}"; do
+            case "$name" in
+              AK3_*.zip) type='Model AnyKernel package' ;;
+              *spoofed*.apk) type='ZSU manager APK (spoofed)' ;;
+              *.apk) type='ZSU manager APK' ;;
+              *susfs*.zip) type='SUSFS support module' ;;
+              *.img) type='Kernel image' ;;
+              *.ko) type='Kernel module' ;;
+              *) type='Support package' ;;
+            esac
+            bytes=$(stat -c%s "$name")
+            size=$(awk "BEGIN { printf \"%.2f\", $bytes / 1048576 }")
+            sha=$(sha256sum "$name" | awk '{print $1}')
+            encoded=$(printf '%s' "$name" | sed 's/ /%20/g')
+            printf '| [%s](https://github.com/%s/%s/releases/download/%s/%s) | %s | %s MiB | `%s` |\n' "$name" "$REPO_OWNER" "$REPO_NAME" "$NEW_TAG" "$encoded" "$type" "$size" "$sha" >> ../release-notes.md
+          done
+      - name: Create release
+        shell: bash
+        run: |
+          set -euo pipefail
+          prerelease=()
+          if [ "${{ inputs.release_type }}" = "Pre-Release" ]; then
+            prerelease+=(--prerelease)
+          fi
+          gh release create "$NEW_TAG" \
+            --title "ONEPLUS Kernels with ZSU & SUSFS $SUSFS_VERSION" \
+            --notes-file release-notes.md \
+            --target "$GITHUB_SHA" \
+            "${prerelease[@]}"
+      - name: Upload release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          find downloaded-artifacts -maxdepth 1 -type f \( -name '*.zip' -o -name '*.apk' -o -name '*.img' -o -name '*.ko' \) -print0 | while IFS= read -r -d '' asset; do
+            gh release upload "$NEW_TAG" "$asset" --clobber
+          done
+      - name: Release summary
+        shell: bash
+        run: |
+          {
+            echo "## ZSU ONEPLUS Release Published"
+            echo
+            echo "- **Tag**: [$NEW_TAG](https://github.com/$REPO_OWNER/$REPO_NAME/releases/tag/$NEW_TAG)"
+            echo "- **Mode**: ${{ inputs.release_type }}"
+            echo "- **Model packages**: $(find downloaded-artifacts -maxdepth 1 -type f -name 'AK3_*.zip' | wc -l)"
+            echo "- **All assets**: $(find downloaded-artifacts -maxdepth 1 -type f \( -name '*.zip' -o -name '*.apk' -o -name '*.img' -o -name '*.ko' \) | wc -l)"
+          } >> "$GITHUB_STEP_SUMMARY"
