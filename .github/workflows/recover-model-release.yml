@@ -22,7 +22,7 @@ jobs:
   recover-and-publish:
     runs-on: ubuntu-latest
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.ZSU_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
       REPO_OWNER: ${{ github.repository_owner }}
       REPO_NAME: ${{ github.event.repository.name }}
       SOURCE_RUN_ID: ${{ inputs.source_run_id }}
