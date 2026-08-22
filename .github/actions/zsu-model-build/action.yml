@@ -1170,9 +1170,10 @@ runs:
         old_getname_flags_call='getname_flags(filename, lookup_flags, NULL);'
         new_getname_flags_call='getname_flags(filename, lookup_flags);'
         if grep -Eq 'extern struct filename \*getname_flags\(const char __user \*, int\);' "$fs_header"; then
-          getname_flags_compat_count=$(grep -FRc --include='*.c' "$old_getname_flags_call" ./fs || true)
+          mapfile -t getname_flags_files < <(grep -FRl --include='*.c' "$old_getname_flags_call" ./fs || true)
+          getname_flags_compat_count=${#getname_flags_files[@]}
           if [ "$getname_flags_compat_count" -gt 0 ]; then
-            sed -i "s|$old_getname_flags_call|$new_getname_flags_call|g" ./fs/*.c
+            sed -i "s|$old_getname_flags_call|$new_getname_flags_call|g" "${getname_flags_files[@]}"
             if grep -FRq --include='*.c' "$old_getname_flags_call" ./fs; then
               echo "::error::Failed to adapt SUSFS getname_flags() calls"
               exit 1
