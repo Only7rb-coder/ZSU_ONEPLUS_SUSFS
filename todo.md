@@ -7,4 +7,7 @@
 - [x] Restart the complete 158-model stable ZSU release matrix.
 - [ ] Monitor every model build and address any shared release-blocking error.
 - [ ] Verify 158 model-named AnyKernel packages plus normal and spoofed ZSU manager APKs in the final release.
-- [ ] Prevent ccache final-statistics logging from copying `ccache.log` onto itself and failing completed model builds.
+- [x] Prevent ccache final-statistics logging from copying `ccache.log` onto itself and failing completed model builds.
+- [x] Verify the repository is permanently public and that hosted Actions runners can start jobs.
+- [x] Rerun the complete 158-model stable ZSU release workflow using public-repository Actions capacity.
+- [x] Install `dos2unix` in the shared model-build dependency step so HMBIRD-enabled models do not fail during patch application.
