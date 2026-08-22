@@ -50,3 +50,9 @@ The reference run contains two model configurations absent from the initial ZSU 
 | `configs/oos16/OP-NORD-CE-5-6.1.134.json` | `OP-NORD-CE-5-6.1.134` |
 
 Both configurations and their matching manifests are required before an all-device ZSU release can truthfully claim parity with the referenced run.
+
+## Active Full-Matrix Investigation
+
+The first 158-device ZSU release attempt started with 19 concurrent jobs as intended. Several early model jobs reached the model source and toolchain preparation stage but failed before a package was produced. Their logs show that the new repository does not yet have the reference project’s pre-populated `ccache-cache` and `lto-cache` release buckets; these cache misses are non-fatal and the workflow correctly continues with fresh state.
+
+The failure investigation is using completed-job logs from the ZSU release run rather than waiting for the entire matrix to finish. The subsequent corrective work must preserve the ZSU manager signing-certificate allowlist and must not publish a release until the model builds produce their model-named packages successfully.
