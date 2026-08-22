@@ -11,3 +11,4 @@
 - [x] Verify the repository is permanently public and that hosted Actions runners can start jobs.
 - [x] Rerun the complete 158-model stable ZSU release workflow using public-repository Actions capacity.
 - [x] Install `dos2unix` in the shared model-build dependency step so HMBIRD-enabled models do not fail during patch application.
+- [x] Make the Android 15 6.6 KernelSU-Next SELinux policy helper symbols externally linkable for HMBIRD-enabled model builds.

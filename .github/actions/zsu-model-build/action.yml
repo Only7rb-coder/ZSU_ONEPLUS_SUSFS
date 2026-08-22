@@ -929,6 +929,29 @@ runs:
           exit 1
         fi
 
+        # Android 15 / 6.6 vendor SELinux call sites used by HMBIRD need these
+        # KernelSU-Next policy helpers to have external linkage. KernelSU-Next
+        # declares the forward prototypes as static even though the matching
+        # definitions are later compiled into the kernelsu object, which leaves
+        # the symbols unavailable to vmlinux at final link time.
+        if [ "${{ env.ANDROID_VER }}" = "android15" ] && [ "${{ env.KERNEL_VER }}" = "6.6" ]; then
+          SELINUX_HIDE="$ZSU_KERNEL_DIR/kernel/feature/selinux_hide.c"
+          if [ ! -f "$SELINUX_HIDE" ]; then
+            echo "::error::KernelSU-Next SELinux helper source is missing: $SELINUX_HIDE"
+            exit 1
+          fi
+          sed -i -E \
+            -e 's/^static int security_context_to_sid_with_policy\(/int security_context_to_sid_with_policy(/' \
+            -e 's/^static int security_sid_to_context_with_policy\(/int security_sid_to_context_with_policy(/' \
+            -e 's/^static void security_compute_av_user_with_policy\(/void security_compute_av_user_with_policy(/' \
+            "$SELINUX_HIDE"
+          if grep -Eq '^static (int|void) security_(context_to_sid|sid_to_context|compute_av_user)_with_policy\(' "$SELINUX_HIDE"; then
+            echo "::error::KernelSU-Next SELinux policy helpers still have internal linkage"
+            exit 1
+          fi
+          echo "✅ Exposed KernelSU-Next Android 15 / 6.6 SELinux policy helpers for HMBIRD linking"
+        fi
+
         KSU_COMMIT_SHA=$(git -C "$ZSU_KERNEL_DIR" rev-parse HEAD)
         BASE_VERSION=30000
         KSU_VERSION=$(expr "$(git -C "$ZSU_KERNEL_DIR" rev-list --count HEAD)" "+" "$BASE_VERSION")
