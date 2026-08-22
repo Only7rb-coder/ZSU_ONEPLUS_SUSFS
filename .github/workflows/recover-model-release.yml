@@ -1,0 +1,196 @@
+name: Recover Completed Model Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: 'Completed model-build workflow run ID whose artifacts will be published'
+        required: true
+        type: string
+      release_type:
+        description: 'Publication mode'
+        required: true
+        type: choice
+        options: [Release, Pre-Release]
+        default: Release
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  recover-and-publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO_OWNER: ${{ github.repository_owner }}
+      REPO_NAME: ${{ github.event.repository.name }}
+      SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Download completed model archives without decompression
+        uses: actions/download-artifact@v8
+        with:
+          pattern: 'AK3_*.zip'
+          path: release-assets
+          merge-multiple: true
+          skip-decompress: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id }}
+
+      - name: Download completed ZSU manager artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: 'ZSU-Manager*'
+          path: downloaded-manager
+          merge-multiple: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id }}
+
+      - name: Download completed SUSFS support artifact
+        uses: actions/download-artifact@v8
+        with:
+          pattern: 'susfs-*'
+          path: downloaded-susfs
+          merge-multiple: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id }}
+
+      - name: Assemble and validate release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+
+          kernel_count=$(find release-assets -maxdepth 1 -type f -name 'AK3_*.zip' | wc -l | tr -d ' ')
+          if [ "$kernel_count" -ne 158 ]; then
+            echo "::error::Expected 158 model archives from run $SOURCE_RUN_ID, found $kernel_count"
+            exit 1
+          fi
+          while IFS= read -r -d '' archive; do
+            unzip -tqq "$archive"
+          done < <(find release-assets -maxdepth 1 -type f -name 'AK3_*.zip' -print0)
+
+          normal_apk=$(find downloaded-manager -type f -name '*.apk' ! -path '*spoofed*' | sort | head -n 1)
+          spoofed_apk=$(find downloaded-manager -type f -name '*.apk' -path '*spoofed*' | sort | head -n 1)
+          if [ -z "$normal_apk" ] || [ -z "$spoofed_apk" ]; then
+            echo '::error::Both normal and spoofed ZSU manager APKs are required'
+            exit 1
+          fi
+          manager_version=$(basename "$normal_apk" | sed -E 's/^ZSU_//; s/-release\.apk$//')
+          cp -f "$normal_apk" "release-assets/ZSU_${manager_version}-release.apk"
+          cp -f "$spoofed_apk" "release-assets/ZSU_${manager_version}-spoofed-release.apk"
+
+          support_module=$(find downloaded-susfs -type f -name '*.zip' | sort | head -n 1 || true)
+          if [ -n "$support_module" ]; then
+            cp -f "$support_module" "release-assets/$(basename "$support_module")"
+          fi
+
+          normal_count=$(find release-assets -maxdepth 1 -type f -name '*.apk' ! -name '*spoofed*' | wc -l | tr -d ' ')
+          spoofed_count=$(find release-assets -maxdepth 1 -type f -name '*spoofed*.apk' | wc -l | tr -d ' ')
+          if [ "$normal_count" -lt 1 ] || [ "$spoofed_count" -lt 1 ]; then
+            echo "::error::Manager asset validation failed: normal=$normal_count spoofed=$spoofed_count"
+            exit 1
+          fi
+
+          first_kernel=$(find release-assets -maxdepth 1 -type f -name 'AK3_*.zip' -printf '%f\n' | sort | head -n 1)
+          susfs_version=$(sed -E 's/.*_SuSFS_(v[0-9.]+)\.zip$/\1/' <<<"$first_kernel")
+          if [[ ! "$susfs_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Unable to derive a SUSFS version from $first_kernel"
+            exit 1
+          fi
+
+          latest=$(gh api "repos/$REPO_OWNER/$REPO_NAME/tags" --paginate --jq "[.[] | select(.name | startswith(\"${susfs_version}-r\")) | .name] | sort_by(split(\"-r\")[1] | tonumber) | last // empty")
+          if [ -z "$latest" ]; then
+            new_tag="${susfs_version}-r1"
+          else
+            new_tag=$(awk -F'-r' '{printf "%s-r%d", $1, $2 + 1}' <<<"$latest")
+          fi
+          source_sha=$(gh api "repos/$REPO_OWNER/$REPO_NAME/actions/runs/$SOURCE_RUN_ID" --jq '.head_sha')
+
+          {
+            echo "NEW_TAG=$new_tag"
+            echo "SOURCE_SHA=$source_sha"
+            echo "SUSFS_VERSION=$susfs_version"
+            echo "MANAGER_VERSION=$manager_version"
+          } >> "$GITHUB_ENV"
+
+      - name: Build release notes and asset manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release-assets
+          mapfile -t kernel_zips < <(find . -maxdepth 1 -type f -name 'AK3_*.zip' -printf '%f\n' | sort)
+          {
+            echo "# ZSU ONEPLUS SUSFS $SUSFS_VERSION"
+            echo
+            echo "> **Recovered source build:** [\`$SOURCE_RUN_ID\`](https://github.com/$REPO_OWNER/$REPO_NAME/actions/runs/$SOURCE_RUN_ID)"
+            echo "> **Recovery workflow:** [\`${{ github.run_id }}\`](https://github.com/$REPO_OWNER/$REPO_NAME/actions/runs/${{ github.run_id }})"
+            echo "> **Optimization:** O2"
+            echo
+            echo '## Model packages (158 total)'
+            echo
+            echo '| Model | OS version | Full kernel version | Package |'
+            echo '|---|---|---|---|'
+            for zip in "${kernel_zips[@]}"; do
+              stem="${zip%.zip}"
+              IFS='_' read -r prefix model os kernel root root_version susfs_label susfs_version <<<"$stem"
+              encoded=$(printf '%s' "$zip" | sed 's/ /%20/g')
+              printf '| %s | %s | %s | [%s](https://github.com/%s/%s/releases/download/%s/%s) |\n' "$model" "$os" "$kernel" "$zip" "$REPO_OWNER" "$REPO_NAME" "$NEW_TAG" "$encoded"
+            done
+            echo
+            echo '## Manager APKs'
+            echo
+            echo 'Both the normal and spoofed ZSU manager APK variants are attached.'
+            echo
+            echo '## Checksums'
+            echo
+            echo '| Asset | SHA-256 |'
+            echo '|---|---|'
+          } > ../release-notes.md
+          mapfile -t assets < <(find . -maxdepth 1 -type f \( -name '*.zip' -o -name '*.apk' \) -printf '%f\n' | sort)
+          for asset in "${assets[@]}"; do
+            encoded=$(printf '%s' "$asset" | sed 's/ /%20/g')
+            sha=$(sha256sum "$asset" | awk '{print $1}')
+            printf '| [%s](https://github.com/%s/%s/releases/download/%s/%s) | `%s` |\n' "$asset" "$REPO_OWNER" "$REPO_NAME" "$NEW_TAG" "$encoded" "$sha" >> ../release-notes.md
+          done
+
+      - name: Create release
+        shell: bash
+        run: |
+          set -euo pipefail
+          prerelease=()
+          if [ "${{ inputs.release_type }}" = 'Pre-Release' ]; then
+            prerelease+=(--prerelease)
+          fi
+          gh release create "$NEW_TAG" \
+            --title "ZSU ONEPLUS SUSFS $SUSFS_VERSION" \
+            --notes-file release-notes.md \
+            --target "$SOURCE_SHA" \
+            "${prerelease[@]}"
+
+      - name: Upload recovered release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          find release-assets -maxdepth 1 -type f \( -name '*.zip' -o -name '*.apk' \) -print0 | while IFS= read -r -d '' asset; do
+            gh release upload "$NEW_TAG" "$asset" --clobber
+          done
+
+      - name: Publish summary
+        shell: bash
+        run: |
+          {
+            echo '## ZSU ONEPLUS SUSFS release recovered and published'
+            echo
+            echo "- **Release**: https://github.com/$REPO_OWNER/$REPO_NAME/releases/tag/$NEW_TAG"
+            echo "- **Model packages**: $(find release-assets -maxdepth 1 -type f -name 'AK3_*.zip' | wc -l)"
+            echo "- **Normal manager APKs**: $(find release-assets -maxdepth 1 -type f -name '*.apk' ! -name '*spoofed*' | wc -l)"
+            echo "- **Spoofed manager APKs**: $(find release-assets -maxdepth 1 -type f -name '*spoofed*.apk' | wc -l)"
+          } >> "$GITHUB_STEP_SUMMARY"
