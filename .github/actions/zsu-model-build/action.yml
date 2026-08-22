@@ -112,6 +112,17 @@ runs:
         echo "Parsed config:"
         jq '.' /tmp/config.json
 
+    - name: Install Android 16 host build dependencies
+      if: ${{ env.OP_ANDROID_VERSION == 'android16' && env.OP_KERNEL_VERSION == '6.12' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ ! -f /usr/include/dwarf.h ]; then
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libdw-dev
+        fi
+        test -f /usr/include/dwarf.h
+
     - name: Initialize model build cache
       shell: bash
       run: |

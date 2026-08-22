@@ -12,3 +12,5 @@
 - [x] Rerun the complete 158-model stable ZSU release workflow using public-repository Actions capacity.
 - [x] Install `dos2unix` in the shared model-build dependency step so HMBIRD-enabled models do not fail during patch application.
 - [x] Make the Android 15 6.6 KernelSU-Next SELinux policy helper symbols externally linkable for HMBIRD-enabled model builds.
+- [ ] Diagnose and correct the shared Android 16 / 6.12 model-build failure affecting the final OOS16 configurations.
+- [x] Install `libdw-dev` for Android 16 / 6.12 builds so `gendwarfksyms` can find the required `dwarf.h` host header.
