@@ -320,7 +320,7 @@ runs:
 
     - name: Sync Kernel Source
       id: sync-kernel-source
-        uses: ./action-source/.github/actions/zsu-model-source-sync
+      uses: ./action-source/.github/actions/zsu-model-source-sync
       with:
         source_location: ${{ env.CONFIG }}
         github_token: ${{ inputs.github_token }}
