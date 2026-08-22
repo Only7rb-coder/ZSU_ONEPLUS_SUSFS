@@ -189,7 +189,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: 19
       matrix: ${{ fromJSON(needs.plan-model-build.outputs.matrix) }}
     name: build (${{ matrix.model }}, ${{ matrix.os_version }}, ${{ matrix.android_version }}-${{ matrix.kernel_version }})
     steps:

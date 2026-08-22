@@ -35,3 +35,18 @@ The package must include the flashable AnyKernel layout, the built kernel `Image
 Every model build must synchronize exactly the source manifest declared by its JSON configuration. The existing generic ZSU workflow already establishes the ZSU integration requirement: use the SUSFS-capable KernelSU Next base and replace its manager allowlist with the private ZSU manager signing certificate. The model-driven action must apply the same integration after model-specific source synchronization, and before SUSFS patching and compilation.
 
 The implementation will use a ZSU-only model build interface. It will not expose the reference project’s root-selection options in the new workflow. The ZSU manager artifacts are fetched from `Only7rb-coder/zsu` and remain attached to release artifacts when produced by the selected build.
+
+## Exact Reference Run Parity Target
+
+The user-supplied successful reference run `32509598443`, from commit `2150b7578c724490f6dbc8b9439b26a8ed82d6c5`, completed 158 model build jobs with no failures. Its first model job began at `2026-08-21T17:43:21Z` and its final model job completed at `2026-08-21T19:14:04Z`.
+
+The run reached 19 concurrent model builds. Across all 158 jobs, the median model build time was 620 seconds and the maximum was 1434 seconds. The ZSU workflow must use a 19-job matrix concurrency limit rather than the earlier four-job limit to match the reference build throughput.
+
+The reference run contains two model configurations absent from the initial ZSU import:
+
+| Missing configuration | Model package identity |
+|---|---|
+| `configs/oos16/OP-ACE-5-RACE-6.1.134.json` | `OP-ACE-5-RACE-6.1.134` |
+| `configs/oos16/OP-NORD-CE-5-6.1.134.json` | `OP-NORD-CE-5-6.1.134` |
+
+Both configurations and their matching manifests are required before an all-device ZSU release can truthfully claim parity with the referenced run.
