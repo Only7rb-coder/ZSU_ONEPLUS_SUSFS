@@ -275,12 +275,34 @@ jobs:
         with:
           path: downloaded-artifacts
           merge-multiple: true
+      - name: Assemble flattened release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          while IFS= read -r -d '' source; do
+            name=$(basename "$source")
+            destination="release-assets/$name"
+            if [ -e "$destination" ]; then
+              if cmp -s "$source" "$destination"; then
+                continue
+              fi
+              echo "::error::Release asset filename collision: $name"
+              exit 1
+            fi
+            cp -f "$source" "$destination"
+          done < <(find downloaded-artifacts -type f \( -name '*.zip' -o -name '*.apk' -o -name '*.img' -o -name '*.ko' \) -print0)
+
+          if ! find release-assets -maxdepth 1 -type f -name 'AK3_*.zip' -print -quit | grep -q .; then
+            echo '::error::No model-named AnyKernel packages were collected'
+            exit 1
+          fi
       - name: Build release notes and asset manifest
         shell: bash
         run: |
           set -euo pipefail
           shopt -s nullglob
-          cd downloaded-artifacts
+          cd release-assets
           mapfile -t KERNEL_ZIPS < <(find . -maxdepth 1 -type f -name 'AK3_*.zip' -printf '%f\n' | sort)
           mapfile -t NORMAL_APKS < <(find . -maxdepth 1 -type f -name '*.apk' ! -name '*spoofed*' -printf '%f\n' | sort)
           mapfile -t SPOOFED_APKS < <(find . -maxdepth 1 -type f -name '*spoofed*.apk' -printf '%f\n' | sort)
@@ -379,7 +401,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          find downloaded-artifacts -maxdepth 1 -type f \( -name '*.zip' -o -name '*.apk' -o -name '*.img' -o -name '*.ko' \) -print0 | while IFS= read -r -d '' asset; do
+          find release-assets -maxdepth 1 -type f \( -name '*.zip' -o -name '*.apk' -o -name '*.img' -o -name '*.ko' \) -print0 | while IFS= read -r -d '' asset; do
             gh release upload "$NEW_TAG" "$asset" --clobber
           done
       - name: Release summary
@@ -390,6 +412,6 @@ jobs:
             echo
             echo "- **Tag**: [$NEW_TAG](https://github.com/$REPO_OWNER/$REPO_NAME/releases/tag/$NEW_TAG)"
             echo "- **Mode**: ${{ inputs.release_type }}"
-            echo "- **Model packages**: $(find downloaded-artifacts -maxdepth 1 -type f -name 'AK3_*.zip' | wc -l)"
-            echo "- **All assets**: $(find downloaded-artifacts -maxdepth 1 -type f \( -name '*.zip' -o -name '*.apk' -o -name '*.img' -o -name '*.ko' \) | wc -l)"
+            echo "- **Model packages**: $(find release-assets -maxdepth 1 -type f -name 'AK3_*.zip' | wc -l)"
+            echo "- **All assets**: $(find release-assets -maxdepth 1 -type f \( -name '*.zip' -o -name '*.apk' -o -name '*.img' -o -name '*.ko' \) | wc -l)"
           } >> "$GITHUB_STEP_SUMMARY"

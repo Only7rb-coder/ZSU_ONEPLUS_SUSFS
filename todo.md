@@ -22,3 +22,4 @@
 - [x] Propagate KernelSU-Next include paths to nested sources so Android 16 builds resolve `uapi/app_profile.h` and `klog.h` consistently.
 - [x] Pass the verified KernelSU-Next root and include paths through the build-wide preprocessor flags for every Android 16 compilation unit.
 - [x] Expose the KernelSU-Next SELinux policy helper symbols required by Android 16 / Linux 6.12 HMBIRD final linking.
+- [ ] Correct release artifact handling so successful model package archives remain intact for publication and can be collected reliably.
