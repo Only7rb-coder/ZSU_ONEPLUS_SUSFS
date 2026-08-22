@@ -2270,6 +2270,14 @@ runs:
         
         KCFLAGS="$KCFLAGS -Wno-error -pipe ${KCFLAGS_EXTRA}"
         KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
+        if [ "${{ inputs.ksu_type }}" = "ZSU" ]; then
+          ZSU_BUILD_INCLUDE_ROOT="${ZSU_KERNEL_FOLDER:-$KERNEL_PLATFORM_FOLDER/KernelSU-Next}/kernel"
+          if [ ! -f "$ZSU_BUILD_INCLUDE_ROOT/include/uapi/app_profile.h" ] || [ ! -f "$ZSU_BUILD_INCLUDE_ROOT/include/klog.h" ]; then
+            echo "::error::KernelSU-Next build include tree is incomplete: $ZSU_BUILD_INCLUDE_ROOT"
+            exit 1
+          fi
+          KCPPFLAGS="$KCPPFLAGS -I$ZSU_BUILD_INCLUDE_ROOT -I$ZSU_BUILD_INCLUDE_ROOT/include"
+        fi
         
         echo "============================================"
         echo "🔧 Build Configuration"

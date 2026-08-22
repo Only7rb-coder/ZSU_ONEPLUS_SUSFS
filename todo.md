@@ -20,3 +20,4 @@
 - [x] Correct the Android 16 `getname_flags()` compatibility implementation so it updates every matching SUSFS source file and verifies the replacement.
 - [x] Verify and repair the ZSU linked `kernel/include/uapi` path when an Android 16 source tree cannot resolve `app_profile.h` during compilation.
 - [x] Propagate KernelSU-Next include paths to nested sources so Android 16 builds resolve `uapi/app_profile.h` and `klog.h` consistently.
+- [x] Pass the verified KernelSU-Next root and include paths through the build-wide preprocessor flags for every Android 16 compilation unit.
