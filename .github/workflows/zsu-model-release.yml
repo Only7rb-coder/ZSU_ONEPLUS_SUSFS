@@ -105,6 +105,8 @@ jobs:
         with:
           sparse-checkout: |
             configs/
+            manifests/
+            scripts/
           sparse-checkout-cone-mode: false
       - id: plan
         name: Create model build matrix
@@ -141,7 +143,8 @@ jobs:
               ;;
           esac
 
-          selected=$(jq -c "$filter | sort_by(.os_version, .model)" source-models.json)
+          jq -c "$filter | sort_by(.os_version, .model)" source-models.json > selected-models.json
+          selected=$(node scripts/enrich-model-kernel-versions.mjs selected-models.json)
           count=$(jq 'length' <<<"$selected")
           if [ "$count" -eq 0 ]; then
             echo "::error::No model configurations match the requested selection"
@@ -172,9 +175,9 @@ jobs:
             echo "- **Selected models**: $count"
             echo "- **ZSU integration**: \`$zsu_ref\` (\`${zsu_commit:0:12}\`)"
             echo ""
-            echo "| Model | OS | Android / Kernel | Manifest |"
+            echo "| Model | OS | Full Kernel Version | Manifest |"
             echo "|---|---|---|---|"
-            jq -r '.[] | "| \(.model) | \(.os_version) | \(.android_version)-\(.kernel_version) | \(.manifest) |"' <<<"$selected"
+            jq -r '.[] | "| \(.model) | \(.os_version) | \(.kernel_full_version) | \(.manifest) |"' <<<"$selected"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload model build matrix
         uses: actions/upload-artifact@v7
@@ -191,7 +194,7 @@ jobs:
       fail-fast: false
       max-parallel: 19
       matrix: ${{ fromJSON(needs.plan-model-build.outputs.matrix) }}
-    name: build (${{ matrix.model }}, ${{ matrix.os_version }}, ${{ matrix.android_version }}-${{ matrix.kernel_version }})
+    name: build (${{ matrix.model }}, ${{ matrix.os_version }}, ${{ matrix.kernel_full_version }})
     steps:
       - uses: actions/checkout@v6
         with:
