@@ -269,7 +269,7 @@ jobs:
   # 当 release_type 不是 Actions 时，创建 GitHub Release
   # Only publish from this dedicated ZSU-root repository.
   release:
-    if: ${{ always() && !cancelled() && inputs.release_type != 'Actions' && github.repository == 'Only7rb-coder/ZSU_Root_SUSFS' }}
+    if: ${{ always() && !cancelled() && inputs.release_type != 'Actions' && github.repository == 'Only7rb-coder/ZSU_ONEPLUS_SUSFS' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -458,11 +458,11 @@ jobs:
 
           1. 恢复原厂 Boot 镜像
           2. 使用 KernelSU 管理器提取内核日志
-          3. 将日志提交到 [Issues](https://github.com/Only7rb-coder/ZSU_Root_SUSFS/issues) 或咨询专业人士
+          3. 将日志提交到 [Issues](https://github.com/Only7rb-coder/ZSU_ONEPLUS_SUSFS/issues) 或咨询专业人士
 
           1. Restore stock boot image
           2. Extract kernel logs using KernelSU Manager
-          3. Submit logs to [Issues](https://github.com/Only7rb-coder/ZSU_Root_SUSFS/issues) or consult experts
+          3. Submit logs to [Issues](https://github.com/Only7rb-coder/ZSU_ONEPLUS_SUSFS/issues) or consult experts
 
           </details>
 
@@ -594,7 +594,7 @@ jobs:
           <pre>${INPUT_CHANGE_LOG}
           </pre>
           
-          Download: <a href="https://github.com/Only7rb-coder/ZSU_Root_SUSFS/releases/tag/${NEW_TAG}">Click Here</a>
+          Download: <a href="https://github.com/Only7rb-coder/ZSU_ONEPLUS_SUSFS/releases/tag/${NEW_TAG}">Click Here</a>
 
           Note: The "commit" here refers to ZSU's commit, not this repository's.
           EOF
