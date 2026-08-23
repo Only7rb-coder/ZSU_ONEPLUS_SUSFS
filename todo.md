@@ -5,8 +5,8 @@
 - [x] Validate all 158 model configurations and ZSU-root build targets locally.
 - [x] Stop the focused single-model verification run before restarting the all-model release.
 - [x] Restart the complete 158-model stable ZSU release matrix.
-- [ ] Monitor every model build and address any shared release-blocking error.
-- [ ] Verify 158 model-named AnyKernel packages plus normal and spoofed ZSU manager APKs in the final release.
+- [x] Monitor every model build and address any shared release-blocking error.
+- [x] Verify 158 model-named AnyKernel packages plus normal and spoofed ZSU manager APKs in the final release.
 - [x] Prevent ccache final-statistics logging from copying `ccache.log` onto itself and failing completed model builds.
 - [x] Verify the repository is permanently public and that hosted Actions runners can start jobs.
 - [x] Rerun the complete 158-model stable ZSU release workflow using public-repository Actions capacity.
@@ -22,4 +22,4 @@
 - [x] Propagate KernelSU-Next include paths to nested sources so Android 16 builds resolve `uapi/app_profile.h` and `klog.h` consistently.
 - [x] Pass the verified KernelSU-Next root and include paths through the build-wide preprocessor flags for every Android 16 compilation unit.
 - [x] Expose the KernelSU-Next SELinux policy helper symbols required by Android 16 / Linux 6.12 HMBIRD final linking.
-- [ ] Correct release artifact handling so successful model package archives remain intact for publication and can be collected reliably.
+- [x] Correct release artifact handling so successful model package archives remain intact for publication and can be collected reliably.
