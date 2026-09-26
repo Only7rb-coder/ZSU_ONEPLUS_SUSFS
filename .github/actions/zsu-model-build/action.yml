@@ -844,7 +844,33 @@ runs:
               attempt=$((attempt + 1))
           done
           
-          echo "::error::All attempts failed for $url"
+          # GitLab may reject archive/codeload requests with HTTP 403 even
+          # though normal Git smart-HTTP access is available. Fall back to a
+          # shallow clone so the build does not depend on GitLab's archive API.
+          echo "⚠️ Archive download unavailable; falling back to shallow Git clone..."
+          rm -rf "$repo_name" "$shm_path" 2>/dev/null
+          local clone_attempt=1
+          while [ $clone_attempt -le 3 ]; do
+              echo " Git fallback attempt $clone_attempt/3: $url ($branch)"
+              rm -rf "$repo_name" 2>/dev/null
+              if [[ "$branch" =~ ^[0-9a-fA-F]{40}$ ]]; then
+                  if git -c http.version=HTTP/1.1 clone --filter=blob:none --no-checkout "$url" "$repo_name" \
+                      && git -C "$repo_name" checkout --detach "$branch"; then
+                      rm -rf "$repo_name/.git"
+                      echo "✅ Success: $repo_name synced by commit"
+                      return 0
+                  fi
+              elif git -c http.version=HTTP/1.1 clone --depth 1 --branch "$branch" "$url" "$repo_name"; then
+                  rm -rf "$repo_name/.git"
+                  echo "✅ Success: $repo_name synced by branch"
+                  return 0
+              fi
+              echo "⚠️ Git fallback attempt $clone_attempt failed; retrying..."
+              sleep $((clone_attempt * 10))
+              clone_attempt=$((clone_attempt + 1))
+          done
+
+          echo "::error::All archive and Git fallback attempts failed for $url"
           return 1
         }
         
