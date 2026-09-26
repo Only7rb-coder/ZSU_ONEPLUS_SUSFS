@@ -1,4 +1,4 @@
-# ZSU Root SUSFS
+# ZSU Root SUSFS v2.3.0
 
 **ZSU Root SUSFS** is a configuration-driven repository for building multi-KMI Generic Kernel Image packages with the ZSU root integration and SUSFS. It uses the user-owned ZSU GKI foundation and follows the same practical pattern as the supplied reference project: a central build dispatcher selects defined Android/KMI tracks, runs isolated builds, gathers artifacts, and optionally publishes a GitHub release.
 

@@ -65,30 +65,30 @@ on:
         type: string
         default: ''
       android12_5_10_susfs_ref:
-        description: 'Optional SUSFS branch or commit for android12-5.10'
+        description: 'SUSFS v2.3.0 commit for android12-5.10'
         required: false
         type: string
-        default: ''
+        default: 9892175b4acec7ee844e113b8d02c0f4d12cdfac
       android13_5_15_susfs_ref:
-        description: 'Optional SUSFS branch or commit for android13-5.15'
+        description: 'SUSFS v2.3.0 commit for android13-5.15'
         required: false
         type: string
-        default: ''
+        default: 687d2d18d94cb2e3e72d1074778d58384d58e379
       android14_6_1_susfs_ref:
-        description: 'Optional SUSFS branch or commit for android14-6.1'
+        description: 'SUSFS v2.3.0 commit for android14-6.1'
         required: false
         type: string
-        default: ''
+        default: 24743360ea08d98f6ad72b856851abed8de5854f
       android15_6_6_susfs_ref:
-        description: 'Optional SUSFS branch or commit for android15-6.6'
+        description: 'SUSFS v2.3.0 commit for android15-6.6'
         required: false
         type: string
-        default: ''
+        default: a0f9c59e2243f8a5db955f4ad1686d5e0ad26e1a
       android16_6_12_susfs_ref:
-        description: 'Optional SUSFS branch or commit for android16-6.12'
+        description: 'SUSFS v2.3.0 commit for android16-6.12'
         required: false
         type: string
-        default: ''
+        default: b213c54126fb243595ce7876e91d84d6e0861fec
 
 jobs:
   get-zsu-manager:

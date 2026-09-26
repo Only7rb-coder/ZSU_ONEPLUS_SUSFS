@@ -903,6 +903,12 @@ runs:
             echo "::error::Failed to fetch SUSFS archive after multiple attempts"
             exit 1
           fi
+          SUSFS_VERSION=$(awk -F= '$1 == "version" { print $2; exit }' susfs4ksu/ksu_module_susfs/module.prop)
+          if [ "$SUSFS_VERSION" != "v2.3.0" ]; then
+            echo "::error::Expected SUSFS v2.3.0, got ${SUSFS_VERSION:-unknown}"
+            exit 1
+          fi
+          echo "SUSFS version verified: $SUSFS_VERSION"
           echo "SUSFS_COMMIT_SHA=$SUSFS_BRANCH" >> $GITHUB_ENV
         fi
         echo "✅ Dependencies cloned"
@@ -1063,7 +1069,7 @@ runs:
               echo "ℹ️ ZSU uses the KernelSU Next SUSFS integration"
             fi
             ;;
-          "v2.2.0")
+          "v2.2.0"|"v2.3.0")
             if [ "${{ inputs.ksu_type }}" = "KSU" ]; then
               cd "$KSU_FOLDER"
               patch -p1 --forward < "$SUSFS_FOLDER/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" || true
