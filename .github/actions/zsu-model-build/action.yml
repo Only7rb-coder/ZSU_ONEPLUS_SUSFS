@@ -11,7 +11,7 @@ inputs:
     type: string
     default: ZSU
   ksu_branch_or_hash:
-    description: 'ZSU kernel integration branch or commit hash (empty = dev-susfs)'
+    description: 'KernelSU-Next ref or commit hash (v3.3.0 matches ZSU Manager UAPI 2)'
     required: false
     type: string
     default: ""
@@ -969,8 +969,9 @@ runs:
 
         ZSU_REF="${{ inputs.ksu_branch_or_hash }}"
         if [ -z "$ZSU_REF" ]; then
-          ZSU_REF="dev-susfs"
+          ZSU_REF="v3.3.0"
         fi
+        echo "Using KernelSU-Next ref: $ZSU_REF"
         curl --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s "$ZSU_REF"
 
         ZSU_KERNEL_DIR="$KERNEL_PLATFORM_FOLDER/KernelSU-Next"

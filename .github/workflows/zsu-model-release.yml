@@ -39,10 +39,10 @@ on:
         type: string
         default: ''
       zsu_branch:
-        description: 'ZSU KernelSU Next integration branch or commit'
+        description: 'KernelSU-Next ref (v3.3.0 matches ZSU manager UAPI 2)'
         required: false
         type: string
-        default: dev-susfs
+        default: v3.3.0
       optimize_level:
         description: 'Compiler optimization level'
         required: true
