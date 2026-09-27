@@ -1039,14 +1039,28 @@ runs:
         KSU_VERSION=$(expr "$(git -C "$ZSU_KERNEL_DIR" rev-list --count HEAD)" "+" "$BASE_VERSION")
         ZSU_MANAGER_SIGNATURE="0x318:ba1159a5819dec96cdcb2498bef73170b0ba1735c12139bde1b7677bf7c5c2ab"
 
-        if ! grep -q '^KSU_NEXT_MANAGER_LIST :=' "$ZSU_KBUILD"; then
-          echo "::error::KernelSU-Next source has no manager allowlist to bind to the private ZSU manager"
-          exit 1
-        fi
-        sed -i "s|^KSU_NEXT_MANAGER_LIST := .*|KSU_NEXT_MANAGER_LIST := $ZSU_MANAGER_SIGNATURE|" "$ZSU_KBUILD"
-        grep -qF "$ZSU_MANAGER_SIGNATURE" "$ZSU_KBUILD"
-        if grep -q '^KSU_NEXT_MANAGER_LIST := .*,' "$ZSU_KBUILD"; then
-          echo "::error::ZSU manager allowlist contains an unexpected additional manager"
+        # KernelSU-Next v3.3.0 replaced the legacy manager allowlist with
+        # separate package-signature size/hash variables. Keep the legacy
+        # path for older refs, but configure the current format explicitly so
+        # the private ZSU manager remains the only accepted manager.
+        ZSU_MANAGER_SIZE="0x318"
+        ZSU_MANAGER_HASH="ba1159a5819dec96cdcb2498bef73170b0ba1735c12139bde1b7677bf7c5c2ab"
+        if grep -q '^KSU_NEXT_MANAGER_LIST :=' "$ZSU_KBUILD"; then
+          sed -i "s|^KSU_NEXT_MANAGER_LIST := .*|KSU_NEXT_MANAGER_LIST := $ZSU_MANAGER_SIGNATURE|" "$ZSU_KBUILD"
+          grep -qF "$ZSU_MANAGER_SIGNATURE" "$ZSU_KBUILD"
+          if grep -q "^KSU_NEXT_MANAGER_LIST := .*," "$ZSU_KBUILD"; then
+            echo "::error::ZSU manager allowlist contains an unexpected additional manager"
+            exit 1
+          fi
+        elif grep -q '^KSU_NEXT_MANAGER_SIZE :=' "$ZSU_KBUILD" && grep -q '^KSU_NEXT_MANAGER_HASH :=' "$ZSU_KBUILD"; then
+          sed -i \
+            -e "s|^KSU_NEXT_MANAGER_SIZE := .*|KSU_NEXT_MANAGER_SIZE := $ZSU_MANAGER_SIZE|" \
+            -e "s|^KSU_NEXT_MANAGER_HASH := .*|KSU_NEXT_MANAGER_HASH := $ZSU_MANAGER_HASH|" \
+            "$ZSU_KBUILD"
+          grep -qF "KSU_NEXT_MANAGER_SIZE := $ZSU_MANAGER_SIZE" "$ZSU_KBUILD"
+          grep -qF "KSU_NEXT_MANAGER_HASH := $ZSU_MANAGER_HASH" "$ZSU_KBUILD"
+        else
+          echo "::error::KernelSU-Next source has no recognized manager signature configuration"
           exit 1
         fi
 
