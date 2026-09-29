@@ -1025,9 +1025,9 @@ runs:
           sed -i -E \
             -e 's/^static int security_context_to_sid_with_policy\(/int security_context_to_sid_with_policy(/' \
             -e 's/^static int security_sid_to_context_with_policy\(/int security_sid_to_context_with_policy(/' \
-            -e 's/^static void security_compute_av_user_with_policy\(/void security_compute_av_user_with_policy(/' \
+            -e 's/^static void (__nocfi )?security_compute_av_user_with_policy\(/void \1security_compute_av_user_with_policy(/' \
             "$SELINUX_HIDE"
-          if grep -Eq '^static (int|void) security_(context_to_sid|sid_to_context|compute_av_user)_with_policy\(' "$SELINUX_HIDE"; then
+          if grep -Eq '^static (int security_context_to_sid_with_policy|int security_sid_to_context_with_policy|void (__nocfi )?security_compute_av_user_with_policy)\(' "$SELINUX_HIDE"; then
             echo "::error::KernelSU-Next SELinux policy helpers still have internal linkage"
             exit 1
           fi
@@ -1169,7 +1169,7 @@ runs:
           fi
           
           if grep -qF 'if (vma->vm_end > last_vma_end)' ./fs/proc/task_mmu.c && ! grep -qxF 'SUSFS_IS_INODE_SUS_MAP' ./fs/proc/task_mmu.c; then
-            echo "Temporarily expand the `last_vma_end` `if` block to fix a matching issue."
+            echo 'Temporarily expand the last_vma_end if block to fix a matching issue.'
             perl -i -0pe 's/\t\t\tif \(vma->vm_end > last_vma_end\)\n\t\t\t\tsmap_gather_stats\(vma, &mss, last_vma_end\);/\t\t\tif (vma->vm_end > last_vma_end) {\n\t\t\t\tsmap_gather_stats(vma, \&mss, last_vma_end);\n\t\t\t\tlast_vma_end = vma->vm_end;\n\t\t\t}/' ./fs/proc/task_mmu.c
             fake_patched_expand=1
           fi
