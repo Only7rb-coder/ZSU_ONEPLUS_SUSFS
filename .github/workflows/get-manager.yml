@@ -160,11 +160,21 @@ jobs:
         id: add_KSU
         run: |
           set -euo pipefail
+          EXPECTED_RELEASE_TAG='v1.3.13'
+          EXPECTED_MANAGER_VERSION='1.3.13_33338'
           mkdir -p manager-artifacts
-          gh release download --repo Only7rb-coder/zsu --pattern 'ZSU_*.apk' --dir manager-artifacts
+          latest_tag=$(gh release view --repo Only7rb-coder/zsu --json tagName --jq '.tagName')
+          if [ "$latest_tag" != "$EXPECTED_RELEASE_TAG" ]; then
+            echo "::error::ZSU manager latest release changed: expected $EXPECTED_RELEASE_TAG, got $latest_tag. Update the compatibility pin before building."
+            exit 1
+          fi
+          gh release download "$EXPECTED_RELEASE_TAG" --repo Only7rb-coder/zsu \
+            --pattern "ZSU_${EXPECTED_MANAGER_VERSION}-release.apk" \
+            --pattern "ZSU_${EXPECTED_MANAGER_VERSION}-release-spoofed.apk" \
+            --dir manager-artifacts
           apk_count=$(find manager-artifacts -maxdepth 1 -type f -name '*.apk' | wc -l)
-          if [ "$apk_count" -lt 2 ]; then
-            echo "::error::Expected normal and spoofed ZSU Manager APKs, found $apk_count"
+          if [ "$apk_count" -ne 2 ]; then
+            echo "::error::Expected exactly two ZSU Manager $EXPECTED_MANAGER_VERSION APKs, found $apk_count"
             exit 1
           fi
           find manager-artifacts -maxdepth 1 -type f -name '*.apk' -print
@@ -186,6 +196,10 @@ jobs:
           LABEL=$(printf '%s' "$FILE" | sed -E 's/^(ZSU|Custom_widgets)_//; s/-release\.apk$//')
           if [ -z "$LABEL" ] || [ "$LABEL" = "$FILE" ]; then
             echo "::error::无法从 APK 文件名读取 manager 版本: $FILE"
+            exit 1
+          fi
+          if [ "$LABEL" != '1.3.13_33338' ]; then
+            echo "::error::Incompatible ZSU manager version: expected 1.3.13_33338, got $LABEL"
             exit 1
           fi
           echo "ZSU manager version: $LABEL"

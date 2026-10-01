@@ -18,6 +18,14 @@ if (config.rootIntegration?.managerPackage !== 'com.zsu.zsu') {
   failures.push('rootIntegration.managerPackage must be com.zsu.zsu')
 }
 
+if (!/^v\d+\.\d+\.\d+$/.test(config.rootIntegration?.managerReleaseTag ?? '')) {
+  failures.push('rootIntegration.managerReleaseTag must be a semantic version tag')
+}
+
+if (!/^\d+\.\d+\.\d+_\d+$/.test(config.rootIntegration?.managerVersion ?? '')) {
+  failures.push('rootIntegration.managerVersion must contain the manager version and version code')
+}
+
 const ids = new Set()
 for (const target of config.targets ?? []) {
   if (!/^android\d+-\d+\.\d+$/.test(target.id ?? '')) {

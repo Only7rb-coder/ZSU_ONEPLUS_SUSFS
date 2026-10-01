@@ -18,7 +18,11 @@ The initial build matrix mirrors the maintained GKI tracks already used by the Z
 
 ## How releases work
 
-Run **Build ZSU Root Kernel** from the repository’s Actions page. Choose `Actions` for a build-only run, `Pre-Release` for testing artifacts, or `Release` only after the selected target has been validated. The workflow retrieves current ZSU manager artifacts, applies the selected ZSU and SUSFS configuration, and checks selected build results before creating a release.
+Run **Build ZSU Root Kernel** from the repository’s Actions page. Choose `Actions` for a build-only run, `Pre-Release` for testing artifacts, or `Release` only after the selected target has been validated. The workflow retrieves the pinned ZSU manager release, applies the selected ZSU and SUSFS configuration, and checks selected build results before creating a release.
+
+### ZSU Manager compatibility
+
+Builds from this repository are intentionally locked to **ZSU Manager `v1.3.13` (`1.3.13_33338`)** from [`Only7rb-coder/zsu`](https://github.com/Only7rb-coder/zsu). The manager download job fails closed if the repository’s latest release is different, so a manager update cannot silently produce kernels with an unverified API/signature combination. Update the compatibility contract in `config/zsu-root-targets.json` and `.github/workflows/get-manager.yml` together after validating a new manager release.
 
 > A successful compilation is not a guarantee that an artifact is safe to flash on every device within a KMI family. Before flashing, retain the matching stock boot image and use a known recovery path for the exact firmware currently installed.
 
