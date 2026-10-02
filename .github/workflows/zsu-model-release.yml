@@ -315,6 +315,12 @@ jobs:
             echo "::error::Both normal and spoofed ZSU manager APKs are required for a model release"
             exit 1
           fi
+          mapfile -t SUSFS_MODULES < <(find . -maxdepth 1 -type f -iname '*susfs*.zip' ! -name 'AK3_*.zip' -printf '%f\n' | sort)
+          if [ "${#SUSFS_MODULES[@]}" -ne 1 ]; then
+            echo "::error::Exactly one standalone SUSFS support module is required; found ${#SUSFS_MODULES[@]}"
+            printf 'Detected module assets: %s\n' "${SUSFS_MODULES[*]:-none}"
+            exit 1
+          fi
 
           {
             echo "# 🎯 ONEPLUS Kernels with ZSU & SUSFS $SUSFS_VERSION"
@@ -353,12 +359,20 @@ jobs:
             echo
             echo "Both normal and spoofed ZSU manager APKs are attached to this release."
             echo
+            echo "## 🧩 SUSFS support module"
+            echo
+            echo "The AnyKernel package contains the SUSFS kernel integration. Install the standalone **SUSFS support module** below in ZSU Manager as well; flashing the kernel package alone cannot make the SUSFS card appear."
+            echo
+            echo "- **SUSFS module:** [${SUSFS_MODULES[0]}](https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/$NEW_TAG/${SUSFS_MODULES[0]})"
+            echo
             echo "## 📥 Installation"
             echo
             echo "1. Download the package whose **model name** and OS version match your device configuration."
             echo "2. Back up the current boot image before flashing."
             echo "3. Flash the selected AnyKernel package with a compatible kernel flasher."
-            echo "4. Reboot and use the attached ZSU manager APK."
+            echo "4. Reboot and install the matching normal ZSU Manager APK (the spoofed APK is an alternate manager build, not a second kernel)."
+            echo "5. In ZSU Manager, install the standalone SUSFS support module and reboot once more."
+            echo "6. Confirm the SUSFS card/version in ZSU Manager. ZSU's jailbreak/late-load mode is separate from SUSFS and is only available when the running kernel supports it."
             echo
             echo "---"
             echo

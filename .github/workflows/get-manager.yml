@@ -224,11 +224,15 @@ jobs:
 
       - name: 添加 SUSFS 模块
         id: add_SUSFS
-        continue-on-error: true
         run: |
+          set -euo pipefail
           BUILD_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
           "https://api.github.com/repos/sidex15/susfs4ksu-module/actions/workflows/build.yml/runs?status=success" |
           jq -r '.workflow_runs[0].id')
+          if [ -z "$BUILD_ID" ] || [ "$BUILD_ID" = "null" ]; then
+            echo "::error::No successful SUSFS module build was found"
+            exit 1
+          fi
 
           ARTIFACTS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
           "https://api.github.com/repos/sidex15/susfs4ksu-module/actions/runs/$BUILD_ID/artifacts")
@@ -236,6 +240,10 @@ jobs:
           DOWNLOAD_URL=$(echo "$ARTIFACTS" | jq -r '.artifacts[0].archive_download_url') 
 
           NAME=$(echo "$ARTIFACTS" | jq -r '.artifacts[0].name')
+          if [ -z "$DOWNLOAD_URL" ] || [ "$DOWNLOAD_URL" = "null" ] || [ -z "$NAME" ] || [ "$NAME" = "null" ]; then
+            echo "::error::The latest SUSFS module build did not expose a downloadable artifact"
+            exit 1
+          fi
           echo "SUSFS_NAME=$NAME" >> $GITHUB_ENV
           NAME="susfs-$NAME.zip"
           
@@ -261,6 +269,15 @@ jobs:
           fi
           cd ..
           rm -rf susfs-temp "$NAME"
+          module=$(find susfs-module -maxdepth 1 -type f -name '*.zip' -print -quit)
+          if [ -z "$module" ] || ! unzip -tqq "$module"; then
+            echo "::error::The SUSFS support module artifact is missing or invalid"
+            exit 1
+          fi
+          if ! unzip -Z1 "$module" | grep -Eq '(^|/)module\.prop$'; then
+            echo "::error::The SUSFS support module has no module.prop"
+            exit 1
+          fi
 
       - name: Notify on failure
         if: steps.add_KSU.outcome == 'failure'

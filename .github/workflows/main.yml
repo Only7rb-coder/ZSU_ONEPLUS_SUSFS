@@ -541,9 +541,22 @@ jobs:
             exit 1
           fi
 
+          mapfile -t SUSFS_MODULES < <(find release-assets -maxdepth 1 -type f -iname '*susfs*.zip' ! -name 'AK3_*.zip' -printf '%f\n' | sort)
+          if [ "${#SUSFS_MODULES[@]}" -ne 1 ]; then
+            echo "::error::Exactly one standalone SUSFS support module is required; found ${#SUSFS_MODULES[@]}"
+            printf 'Detected module assets: %s\n' "${SUSFS_MODULES[*]:-none}"
+            exit 1
+          fi
+
           {
             echo ""
             echo "---"
+            echo ""
+            echo "## 🧩 SUSFS support module"
+            echo ""
+            echo "The AnyKernel package contains the SUSFS kernel integration. Install the standalone **SUSFS support module** in ZSU Manager after flashing; flashing the kernel package alone cannot make the SUSFS card appear."
+            echo ""
+            echo "- **SUSFS module:** [${SUSFS_MODULES[0]}](https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/$NEW_TAG/${SUSFS_MODULES[0]})"
             echo ""
             echo "## 📦 Release Assets (${#ASSETS[@]} total)"
             echo ""
