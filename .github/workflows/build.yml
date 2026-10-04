@@ -340,7 +340,26 @@ jobs:
             sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
           fi
 
-          $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
+          # Googlesource occasionally drops fetches under load. Retry the full
+          # sync before failing the build; repo sync is safe to resume after a
+          # partial fetch, and the increasing delay avoids hammering upstream.
+          SYNC_ATTEMPTS=4
+          for attempt in $(seq 1 "$SYNC_ATTEMPTS"); do
+            echo "Android source sync attempt $attempt/$SYNC_ATTEMPTS"
+            if $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast; then
+              echo "Android source sync succeeded on attempt $attempt"
+              break
+            fi
+
+            if [ "$attempt" -eq "$SYNC_ATTEMPTS" ]; then
+              echo "::error::Android source sync failed after $SYNC_ATTEMPTS attempts"
+              exit 1
+            fi
+
+            delay=$((15 * attempt))
+            echo "Android source sync failed; retrying in ${delay}s"
+            sleep "$delay"
+          done
           echo "REMOTE_BRANCH=$REMOTE_BRANCH" >> $GITHUB_ENV
 
       # ==================== 伪装 /proc/config.gz（自动检测） ====================
