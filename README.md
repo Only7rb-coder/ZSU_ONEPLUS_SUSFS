@@ -22,7 +22,7 @@ Run **Build ZSU Root Kernel** from the repository’s Actions page. Choose `Acti
 
 ### ZSU Manager compatibility
 
-Builds from this repository are intentionally locked to **ZSU Manager `v1.3.13` (`1.3.13_33338`)** from [`Only7rb-coder/zsu`](https://github.com/Only7rb-coder/zsu). The manager download job fails closed if the repository’s latest release is different, so a manager update cannot silently produce kernels with an unverified API/signature combination. Update the compatibility contract in `config/zsu-root-targets.json` and `.github/workflows/get-manager.yml` together after validating a new manager release.
+Builds from this repository are intentionally locked to **ZSU Manager `v1.3.14` (`1.3.14_33338`)** from [`Only7rb-coder/zsu`](https://github.com/Only7rb-coder/zsu). This release retains the same manager build identity (`33338`) and its upstream change is limited to the flash-screen crash fix and displayed app version; the API/signature integration remains aligned with the pinned kernel branch. The manager download job fails closed if the repository’s latest release differs, so unvalidated manager changes cannot silently enter kernel releases. Update the compatibility contract in `config/zsu-root-targets.json` and `.github/workflows/get-manager.yml` together after validating a new manager release.
 
 ### SUSFS installation (required)
 
