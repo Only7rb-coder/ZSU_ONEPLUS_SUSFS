@@ -88,9 +88,14 @@ jobs:
           cp -f "$spoofed_apk" "release-assets/ZSU_${manager_version}-spoofed-release.apk"
 
           support_module=$(find downloaded-susfs -type f -name '*.zip' | sort | head -n 1 || true)
-          if [ -n "$support_module" ]; then
-            cp -f "$support_module" "release-assets/$(basename "$support_module")"
+          if [ -z "$support_module" ]; then
+            echo '::error::A SUSFS support module is required for every ZSU release'
+            exit 1
           fi
+          cp -f "$support_module" "release-assets/$(basename "$support_module")"
+          first_kernel=$(find release-assets -maxdepth 1 -type f -name 'AK3_*.zip' -printf '%p\n' | sort | head -n 1)
+          chmod +x scripts/validate-susfs-package.sh
+          scripts/validate-susfs-package.sh "$first_kernel" "release-assets/$(basename "$support_module")"
 
           normal_count=$(find release-assets -maxdepth 1 -type f -name '*.apk' ! -name '*spoofed*' | wc -l | tr -d ' ')
           spoofed_count=$(find release-assets -maxdepth 1 -type f -name '*spoofed*.apk' | wc -l | tr -d ' ')
@@ -99,7 +104,7 @@ jobs:
             exit 1
           fi
 
-          first_kernel=$(find release-assets -maxdepth 1 -type f -name 'AK3_*.zip' -printf '%f\n' | sort | head -n 1)
+          first_kernel=$(basename "$first_kernel")
           susfs_version=$(sed -E 's/.*_SuSFS_(v[0-9.]+)\.zip$/\1/' <<<"$first_kernel")
           if [[ ! "$susfs_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::Unable to derive a SUSFS version from $first_kernel"

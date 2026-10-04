@@ -548,6 +548,16 @@ jobs:
             exit 1
           fi
 
+          mapfile -t KERNEL_PACKAGES < <(find release-assets -maxdepth 1 -type f -name 'AK3_*.zip' -printf '%p\n' | sort)
+          if [ "${#KERNEL_PACKAGES[@]}" -eq 0 ]; then
+            echo "::error::No model kernel packages were produced. Refusing to publish a module-only release."
+            exit 1
+          fi
+          chmod +x scripts/validate-susfs-package.sh
+          for kernel_package in "${KERNEL_PACKAGES[@]}"; do
+            scripts/validate-susfs-package.sh "$kernel_package" "release-assets/${SUSFS_MODULES[0]}"
+          done
+
           {
             echo ""
             echo "---"

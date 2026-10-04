@@ -274,10 +274,23 @@ jobs:
             echo "::error::The SUSFS support module artifact is missing or invalid"
             exit 1
           fi
-          if ! unzip -Z1 "$module" | grep -Eq '(^|/)module\.prop$'; then
+          module_prop=$(unzip -Z1 "$module" | grep -E '(^|/)module\.prop$' | head -n 1 || true)
+          if [ -z "$module_prop" ]; then
             echo "::error::The SUSFS support module has no module.prop"
             exit 1
           fi
+          module_prop_text=$(unzip -p "$module" "$module_prop")
+          module_id=$(awk -F= '$1 == "id" { print $2; exit }' <<< "$module_prop_text")
+          module_version=$(awk -F= '$1 == "version" { print $2; exit }' <<< "$module_prop_text")
+          if [ "$module_id" != "susfs4ksu" ] || [[ ! "$module_version" == v* ]]; then
+            echo "::error::Unexpected SUSFS module metadata: id=${module_id:-missing}, version=${module_version:-missing}"
+            exit 1
+          fi
+          if ! unzip -Z1 "$module" | grep -Eq '(^|/)tools/ksu_susfs_arm64$'; then
+            echo "::error::The SUSFS support module has no arm64 helper"
+            exit 1
+          fi
+          echo "Validated SUSFS module: id=$module_id version=$module_version"
 
       - name: Notify on failure
         if: steps.add_KSU.outcome == 'failure'

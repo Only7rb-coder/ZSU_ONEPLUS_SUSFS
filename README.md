@@ -24,6 +24,17 @@ Run **Build ZSU Root Kernel** from the repository’s Actions page. Choose `Acti
 
 Builds from this repository are intentionally locked to **ZSU Manager `v1.3.13` (`1.3.13_33338`)** from [`Only7rb-coder/zsu`](https://github.com/Only7rb-coder/zsu). The manager download job fails closed if the repository’s latest release is different, so a manager update cannot silently produce kernels with an unverified API/signature combination. Update the compatibility contract in `config/zsu-root-targets.json` and `.github/workflows/get-manager.yml` together after validating a new manager release.
 
+### SUSFS installation (required)
+
+SUSFS has two parts. **Flashing the kernel ZIP alone does not install the SUSFS userspace module**, so the SUSFS page/card may remain unavailable in the manager:
+
+1. Flash the matching `AK3_..._ZSU_..._SuSFS_...zip` in recovery.
+2. Boot Android, install the release’s `ksu_module_susfs.zip` **inside ZSU Manager**, enable it, and reboot once.
+
+Use only the ZSU Manager APK shipped with the same release. The kernel build accepts only the pinned ZSU signing certificate; a normal KernelSU or KernelSU-Next manager is intentionally rejected. Do not install the SUSFS module through another root manager.
+
+If SUSFS is still unavailable, confirm that the kernel and module came from the same release, that the selected model package matches the device and firmware, and that the module is enabled after reboot. Release automation now refuses to publish a kernel release without a valid arm64 SUSFS module.
+
 > A successful compilation is not a guarantee that an artifact is safe to flash on every device within a KMI family. Before flashing, retain the matching stock boot image and use a known recovery path for the exact firmware currently installed.
 
 ## Configuration checks
