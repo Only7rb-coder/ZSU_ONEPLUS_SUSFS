@@ -149,7 +149,7 @@ jobs:
       fail-fast: false
       # Kernel compiles are resource-intensive; cap concurrent runners to keep the
       # validation matrix reliable on hosted CI capacity.
-      max-parallel: 4
+      max-parallel: 3
       matrix:
         include: ${{ fromJson(needs['prepare-matrix'].outputs.matrix) }}
     uses: ./.github/workflows/build.yml

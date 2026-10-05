@@ -115,6 +115,7 @@ jobs:
     name: "5.10.${{ matrix.sub_level }}-${{ matrix.os_patch_level }}"
     strategy:
       fail-fast: false
+      max-parallel: 3
       matrix:
         include:
           - sub_level: "66"
