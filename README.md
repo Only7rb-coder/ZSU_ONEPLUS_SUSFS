@@ -16,6 +16,8 @@ The initial build matrix mirrors the maintained GKI tracks already used by the Z
 | `android15-6.6` | Android 15 | 6.6 | ZSU-root GKI artifacts and AnyKernel packaging where supported |
 | `android16-6.12` | Android 16 | 6.12 | ZSU-root GKI artifacts and AnyKernel packaging where supported |
 
+The Android 2025-07/08 refs for `6.1.141`, `6.1.145`, `6.6.92`, `6.6.98`, `6.12.30`, and `6.12.38` were removed from the matrix after their upstream `kernel/common` refs disappeared. Where the same kernel sublevel has a valid 2025-09 ref, the matrix retains that official later-month build (`6.1.145`, `6.6.98`, and `6.12.38`) rather than relabeling another branch.
+
 ## How releases work
 
 Run **Build ZSU Root Kernel** from the repository’s Actions page. Choose `Actions` for a build-only run, `Pre-Release` for testing artifacts, or `Release` only after the selected target has been validated. The workflow retrieves the pinned ZSU manager release, applies the selected ZSU and SUSFS configuration, and checks selected build results before creating a release.
