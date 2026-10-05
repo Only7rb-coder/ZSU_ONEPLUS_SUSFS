@@ -364,6 +364,12 @@ jobs:
             sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
           fi
 
+          # This repository builds the GKI kernel and does not consume the
+          # optional virtual-device module. Exclude it from the manifest so a
+          # transient failure at its independent AOSP endpoint cannot prevent
+          # the kernel source from syncing.
+          sed -i '/name="kernel\/common-modules\/virtual-device"/d' "$DEFAULT_MANIFEST_PATH"
+
           # Googlesource occasionally drops fetches while the matrix is busy.
           # Retry transient project fetches inside repo, cap per-runner
           # parallelism, then retry a resumable full sync with longer backoff.
