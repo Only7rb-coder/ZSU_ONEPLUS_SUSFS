@@ -329,10 +329,22 @@ jobs:
           FORMATTED_BRANCH="$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION-$INPUT_OS_PATCH_LEVEL"
           echo "初始化 repo，分支: common-${FORMATTED_BRANCH}"
 
+          # The AOSP kernel/common endpoint can throttle concurrent matrix
+          # fetches.  Route only this high-volume repository through the
+          # maintained AOSP GitHub mirror; the manifest and all other projects
+          # continue to come from the canonical AOSP service.
+          KERNEL_COMMON_MIRROR="https://github.com/aosp-mirror/kernel_common.git"
+          git config --global url."${KERNEL_COMMON_MIRROR}".insteadOf "https://android.googlesource.com/kernel/common"
+          echo "kernel/common mirror: ${KERNEL_COMMON_MIRROR}"
+
           $REPO init --depth=1 -u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --repo-rev=v2.16
 
           # 检查是否为已弃用的分支
-          REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
+          REMOTE_BRANCH=$(git ls-remote "$KERNEL_COMMON_MIRROR" "refs/heads/${FORMATTED_BRANCH}")
+          if [ -z "$REMOTE_BRANCH" ]; then
+            echo "::error::kernel/common mirror does not contain branch ${FORMATTED_BRANCH}"
+            exit 1
+          fi
           DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
 
           if grep -q deprecated <<< $REMOTE_BRANCH; then
