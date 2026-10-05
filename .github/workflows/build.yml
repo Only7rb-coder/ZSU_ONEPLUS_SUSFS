@@ -329,30 +329,20 @@ jobs:
           FORMATTED_BRANCH="$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION-$INPUT_OS_PATCH_LEVEL"
           echo "初始化 repo，分支: common-${FORMATTED_BRANCH}"
 
-          # The AOSP kernel/common endpoint can throttle concurrent matrix
-          # fetches.  Route only this high-volume repository through the
-          # maintained AOSP GitHub mirror; the manifest and all other projects
-          # continue to come from the canonical AOSP service.
-          KERNEL_COMMON_MIRROR="https://github.com/aosp-mirror/kernel_common.git"
+          # Use canonical AOSP kernel/common refs. Some GitHub mirror refs are
+          # stale or point at unrelated trees, which can silently build the
+          # wrong source revision. Bounded repo retries below handle transient
+          # AOSP fetch throttling without rewriting URLs for other projects.
           KERNEL_COMMON_AOSP="https://android.googlesource.com/kernel/common"
 
           $REPO init --depth=1 -u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --repo-rev=v2.16
 
-          # The mirror does not carry every historical Android 12 branch.
-          # Use it only when this exact branch exists; otherwise retain the
-          # canonical AOSP remote instead of rejecting a valid manifest.
-          if git ls-remote --exit-code "$KERNEL_COMMON_MIRROR" "refs/heads/${FORMATTED_BRANCH}" >/dev/null 2>&1; then
-            git config --global url."${KERNEL_COMMON_MIRROR}".insteadOf "$KERNEL_COMMON_AOSP"
-            REMOTE_BRANCH=$(git ls-remote "$KERNEL_COMMON_MIRROR" "refs/heads/${FORMATTED_BRANCH}")
-            echo "kernel/common source: ${KERNEL_COMMON_MIRROR}"
-          else
-            # Older Android branches may be retained by AOSP under the
-            # deprecated/ namespace rather than the normal branch namespace.
-            REMOTE_BRANCH=$(git ls-remote "$KERNEL_COMMON_AOSP" \
-              "refs/heads/${FORMATTED_BRANCH}" \
-              "refs/heads/deprecated/${FORMATTED_BRANCH}")
-            echo "kernel/common source: ${KERNEL_COMMON_AOSP}"
-          fi
+          # Older Android branches may be retained by AOSP under the
+          # deprecated/ namespace rather than the normal branch namespace.
+          REMOTE_BRANCH=$(git ls-remote "$KERNEL_COMMON_AOSP" \
+            "refs/heads/${FORMATTED_BRANCH}" \
+            "refs/heads/deprecated/${FORMATTED_BRANCH}")
+          echo "kernel/common source: ${KERNEL_COMMON_AOSP}"
           if [ -z "$REMOTE_BRANCH" ]; then
             echo "::error::kernel/common does not contain branch ${FORMATTED_BRANCH}"
             exit 1
