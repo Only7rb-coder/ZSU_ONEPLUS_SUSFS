@@ -334,15 +334,23 @@ jobs:
           # maintained AOSP GitHub mirror; the manifest and all other projects
           # continue to come from the canonical AOSP service.
           KERNEL_COMMON_MIRROR="https://github.com/aosp-mirror/kernel_common.git"
-          git config --global url."${KERNEL_COMMON_MIRROR}".insteadOf "https://android.googlesource.com/kernel/common"
-          echo "kernel/common mirror: ${KERNEL_COMMON_MIRROR}"
+          KERNEL_COMMON_AOSP="https://android.googlesource.com/kernel/common"
 
           $REPO init --depth=1 -u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --repo-rev=v2.16
 
-          # 检查是否为已弃用的分支
-          REMOTE_BRANCH=$(git ls-remote "$KERNEL_COMMON_MIRROR" "refs/heads/${FORMATTED_BRANCH}")
+          # The mirror does not carry every historical Android 12 branch.
+          # Use it only when this exact branch exists; otherwise retain the
+          # canonical AOSP remote instead of rejecting a valid manifest.
+          if git ls-remote --exit-code "$KERNEL_COMMON_MIRROR" "refs/heads/${FORMATTED_BRANCH}" >/dev/null 2>&1; then
+            git config --global url."${KERNEL_COMMON_MIRROR}".insteadOf "$KERNEL_COMMON_AOSP"
+            REMOTE_BRANCH=$(git ls-remote "$KERNEL_COMMON_MIRROR" "refs/heads/${FORMATTED_BRANCH}")
+            echo "kernel/common source: ${KERNEL_COMMON_MIRROR}"
+          else
+            REMOTE_BRANCH=$(git ls-remote "$KERNEL_COMMON_AOSP" "refs/heads/${FORMATTED_BRANCH}")
+            echo "kernel/common source: ${KERNEL_COMMON_AOSP}"
+          fi
           if [ -z "$REMOTE_BRANCH" ]; then
-            echo "::error::kernel/common mirror does not contain branch ${FORMATTED_BRANCH}"
+            echo "::error::kernel/common does not contain branch ${FORMATTED_BRANCH}"
             exit 1
           fi
           DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
