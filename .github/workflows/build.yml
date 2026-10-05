@@ -346,7 +346,11 @@ jobs:
             REMOTE_BRANCH=$(git ls-remote "$KERNEL_COMMON_MIRROR" "refs/heads/${FORMATTED_BRANCH}")
             echo "kernel/common source: ${KERNEL_COMMON_MIRROR}"
           else
-            REMOTE_BRANCH=$(git ls-remote "$KERNEL_COMMON_AOSP" "refs/heads/${FORMATTED_BRANCH}")
+            # Older Android branches may be retained by AOSP under the
+            # deprecated/ namespace rather than the normal branch namespace.
+            REMOTE_BRANCH=$(git ls-remote "$KERNEL_COMMON_AOSP" \
+              "refs/heads/${FORMATTED_BRANCH}" \
+              "refs/heads/deprecated/${FORMATTED_BRANCH}")
             echo "kernel/common source: ${KERNEL_COMMON_AOSP}"
           fi
           if [ -z "$REMOTE_BRANCH" ]; then
