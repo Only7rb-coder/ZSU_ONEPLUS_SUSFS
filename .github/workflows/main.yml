@@ -36,6 +36,12 @@ on:
           - Release
         default: Actions
 
+      artifact_run_id:
+        description: "已完成的主构建运行 ID（仅重新打包发布，不重新编译）"
+        type: string
+        default: ""
+        required: false
+
       # ==================== KernelSU 配置 ====================
       # KernelSU 变体固定为 ZSU
       kernelsu_branch:
@@ -138,7 +144,7 @@ jobs:
 
   # ==================== Android 12 - 5.10 构建 ====================
   build-a12-5-10:
-    if: inputs.build_a12_5_10 || inputs.build_all
+    if: ${{ inputs.artifact_run_id == '' && (inputs.build_a12_5_10 || inputs.build_all) }}
     uses: ./.github/workflows/kernel-a12-5-10.yml
     secrets: inherit
     with:
@@ -156,7 +162,7 @@ jobs:
 
   # ==================== Android 13 - 5.15 构建 ====================
   build-a13-5-15:
-    if: inputs.build_a13_5_15 || inputs.build_all
+    if: ${{ inputs.artifact_run_id == '' && (inputs.build_a13_5_15 || inputs.build_all) }}
     uses: ./.github/workflows/kernel-a13-5-15.yml
     secrets: inherit
     with:
@@ -174,7 +180,7 @@ jobs:
 
   # ==================== Android 14 - 6.1 构建 ====================
   build-a14-6-1:
-    if: inputs.build_a14_6_1 || inputs.build_all
+    if: ${{ inputs.artifact_run_id == '' && (inputs.build_a14_6_1 || inputs.build_all) }}
     uses: ./.github/workflows/kernel-a14-6-1.yml
     secrets: inherit
     with:
@@ -192,7 +198,7 @@ jobs:
 
   # ==================== Android 15 - 6.6 构建 ====================
   build-a15-6-6:
-    if: inputs.build_a15_6_6 || inputs.build_all
+    if: ${{ inputs.artifact_run_id == '' && (inputs.build_a15_6_6 || inputs.build_all) }}
     uses: ./.github/workflows/kernel-a15-6-6.yml
     secrets: inherit
     with:
@@ -210,7 +216,7 @@ jobs:
 
   # ==================== Android 16 - 6.12 构建 ====================
   build-a16-6-12:
-    if: inputs.build_a16_6_12 || inputs.build_all
+    if: ${{ inputs.artifact_run_id == '' && (inputs.build_a16_6_12 || inputs.build_all) }}
     uses: ./.github/workflows/kernel-a16-6-12.yml
     secrets: inherit
     with:
@@ -229,7 +235,7 @@ jobs:
   # ==================== 收集补丁冲突文件 ====================
   # 汇总所有构建任务中的 .rej 文件，方便调试补丁问题
   collect-rejects:
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && inputs.artifact_run_id == '' }}
     runs-on: ubuntu-latest
     needs:
       - build-a12-5-10
@@ -327,11 +333,11 @@ jobs:
               failed=1
             fi
           }
-          check_build "${{ inputs.build_a12_5_10 || inputs.build_all }}" "build-a12-5-10" "${{ needs.build-a12-5-10.result }}"
-          check_build "${{ inputs.build_a13_5_15 || inputs.build_all }}" "build-a13-5-15" "${{ needs.build-a13-5-15.result }}"
-          check_build "${{ inputs.build_a14_6_1 || inputs.build_all }}" "build-a14-6-1" "${{ needs.build-a14-6-1.result }}"
-          check_build "${{ inputs.build_a15_6_6 || inputs.build_all }}" "build-a15-6-6" "${{ needs.build-a15-6-6.result }}"
-          check_build "${{ inputs.build_a16_6_12 || inputs.build_all }}" "build-a16-6-12" "${{ needs.build-a16-6-12.result }}"
+          check_build "${{ inputs.artifact_run_id == '' && (inputs.build_a12_5_10 || inputs.build_all) }}" "build-a12-5-10" "${{ needs.build-a12-5-10.result }}"
+          check_build "${{ inputs.artifact_run_id == '' && (inputs.build_a13_5_15 || inputs.build_all) }}" "build-a13-5-15" "${{ needs.build-a13-5-15.result }}"
+          check_build "${{ inputs.artifact_run_id == '' && (inputs.build_a14_6_1 || inputs.build_all) }}" "build-a14-6-1" "${{ needs.build-a14-6-1.result }}"
+          check_build "${{ inputs.artifact_run_id == '' && (inputs.build_a15_6_6 || inputs.build_all) }}" "build-a15-6-6" "${{ needs.build-a15-6-6.result }}"
+          check_build "${{ inputs.artifact_run_id == '' && (inputs.build_a16_6_12 || inputs.build_all) }}" "build-a16-6-12" "${{ needs.build-a16-6-12.result }}"
           [[ "$failed" -ne 0 ]] && exit 1 || true
 
       - name: 检出代码
@@ -399,9 +405,10 @@ jobs:
           cat > release_body.md << EOF
           # 🎯 ONEPLUS GKI Kernels with ZSU & SUSFS ${{ env.SUS_VER }}
 
-          > **Build Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-          > **Build ID:** \`${{ github.run_id }}\`
-          > **Workflow:** [\`${{ github.workflow }}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          > **Release Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          > **Build ID:** \`${{ inputs.artifact_run_id || github.run_id }}\`
+          > **Build Workflow:** [\`${{ github.workflow }}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ inputs.artifact_run_id || github.run_id }})
+          > **Release Packaging Run:** [#${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
           ---
 
@@ -518,22 +525,83 @@ jobs:
           echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
           echo "Generated release tag: $NEW_TAG"
 
+      - name: 验证构建产物来源
+        if: ${{ inputs.artifact_run_id != '' }}
+        env:
+          ARTIFACT_RUN_ID: ${{ inputs.artifact_run_id }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$ARTIFACT_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::artifact_run_id must be a numeric GitHub Actions run ID."
+            exit 1
+          fi
+
+          source_run=$(gh api "repos/$REPO_OWNER/$REPO_NAME/actions/runs/$ARTIFACT_RUN_ID")
+          if [[ "$(jq -r '.status' <<< "$source_run")" != "completed" || "$(jq -r '.event' <<< "$source_run")" != "workflow_dispatch" || "$(jq -r '.head_branch' <<< "$source_run")" != "main" || "$(jq -r '.path' <<< "$source_run")" != ".github/workflows/main.yml" ]]; then
+            echo "::error::Source run must be a completed main-branch workflow_dispatch of .github/workflows/main.yml."
+            exit 1
+          fi
+
+          # The source run may have failed only in its release job; every selected kernel matrix job must pass.
+          jobs=$(gh api --paginate "repos/$REPO_OWNER/$REPO_NAME/actions/runs/$ARTIFACT_RUN_ID/jobs?per_page=100" \
+            --jq '.jobs[] | select((.name | test("^build-a(12|13|14|15|16)-")) and (.name | endswith("prepare-matrix") | not) and (.name | endswith("get-ksu-manager") | not)) | [.name, .conclusion] | @tsv')
+          job_count=$(printf '%s\n' "$jobs" | awk 'NF { count++ } END { print count + 0 }')
+          bad_jobs=$(printf '%s\n' "$jobs" | awk -F '\t' 'NF && $2 != "success" { print $1 " (" $2 ")" }')
+          if [[ "$job_count" -eq 0 || -n "$bad_jobs" ]]; then
+            echo "::error::Source run has no successful kernel matrix or includes unsuccessful jobs."
+            printf '%s\n' "${bad_jobs:-No kernel matrix jobs found.}"
+            exit 1
+          fi
+
+          for group in build-a12-5-10 build-a13-5-15 build-a14-6-1 build-a15-6-6 build-a16-6-12; do
+            if ! grep -q "^${group} / " <<< "$jobs"; then
+              echo "::error::Source run is missing the $group matrix."
+              exit 1
+            fi
+          done
+          artifact_names=$(gh api --paginate "repos/$REPO_OWNER/$REPO_NAME/actions/runs/$ARTIFACT_RUN_ID/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired == false and (.name | test("^ZSU_kernel-")) and (.name | endswith("-Rejects") | not)) | .name')
+          artifact_count=$(printf '%s\n' "$artifact_names" | awk 'NF { count++ } END { print count + 0 }')
+          if [[ "$artifact_count" -ne "$job_count" ]]; then
+            echo "::error::Expected one unexpired kernel package artifact per successful matrix job; found $artifact_count for $job_count jobs."
+            exit 1
+          fi
+          echo "Validated $job_count successful kernel matrix jobs from source run $ARTIFACT_RUN_ID."
+
       - name: 下载构建产物
         uses: actions/download-artifact@v8
         with:
           path: ./downloaded-artifacts
+          run-id: ${{ inputs.artifact_run_id || github.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 准备发布资产和清单
         run: |
           set -euo pipefail
           mkdir -p release-assets
 
-          find ./downloaded-artifacts -type f \
-            \( -name "*.apk" -o -name "*.zip" -o -name "*.img" -o -name "*.ko" \) \
-            ! -path "*-Rejects/*" -print0 | \
+          if [[ "${{ inputs.cancel_susfs }}" == "true" ]]; then
+            echo "::error::This release requires SUSFS-enabled kernel packages; cancel_susfs must be false."
+            exit 1
+          fi
+          SUSFS_VERSION="$SUS_VER"
+          if [[ ! "$SUSFS_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Cannot label kernel packages with an invalid SUSFS version: $SUSFS_VERSION"
+            exit 1
+          fi
+
           while IFS= read -r -d '' file; do
-            cp -f "$file" "release-assets/$(basename "$file")"
-          done
+            filename=$(basename "$file")
+            case "$filename" in
+              *AnyKernel3_SuSFS_v*.zip|AK3_*_SuSFS_v*.zip) ;;
+              *AnyKernel3.zip|AK3_*.zip)
+                filename="${filename%.zip}_SuSFS_${SUSFS_VERSION}.zip"
+                ;;
+            esac
+            cp -f "$file" "release-assets/$filename"
+          done < <(find ./downloaded-artifacts -type f \
+            \( -name "*.apk" -o -name "*.zip" -o -name "*.img" -o -name "*.ko" \) \
+            ! -path "*-Rejects/*" ! -path "*/AIO-REJ/*" -print0)
 
           mapfile -t ASSETS < <(find release-assets -maxdepth 1 -type f -printf '%p\n' | sort)
           if [ "${#ASSETS[@]}" -eq 0 ]; then
@@ -541,14 +609,14 @@ jobs:
             exit 1
           fi
 
-          mapfile -t SUSFS_MODULES < <(find release-assets -maxdepth 1 -type f -iname '*susfs*.zip' ! -name 'AK3_*.zip' -printf '%f\n' | sort)
+          mapfile -t SUSFS_MODULES < <(find release-assets -maxdepth 1 -type f -iname '*susfs*.zip' ! -name 'AK3_*.zip' ! -name '*AnyKernel3*.zip' -printf '%f\n' | sort)
           if [ "${#SUSFS_MODULES[@]}" -ne 1 ]; then
             echo "::error::Exactly one standalone SUSFS support module is required; found ${#SUSFS_MODULES[@]}"
             printf 'Detected module assets: %s\n' "${SUSFS_MODULES[*]:-none}"
             exit 1
           fi
 
-          mapfile -t KERNEL_PACKAGES < <(find release-assets -maxdepth 1 -type f -name 'AK3_*.zip' -printf '%p\n' | sort)
+          mapfile -t KERNEL_PACKAGES < <(find release-assets -maxdepth 1 -type f \( -name '*AnyKernel3*.zip' -o -name 'AK3_*.zip' \) -printf '%p\n' | sort)
           if [ "${#KERNEL_PACKAGES[@]}" -eq 0 ]; then
             echo "::error::No model kernel packages were produced. Refusing to publish a module-only release."
             exit 1
@@ -580,7 +648,7 @@ jobs:
               size_mib=$(awk "BEGIN { printf \"%.2f\", $size_bytes / 1048576 }")
               sha256=$(sha256sum "$file" | awk '{print $1}')
               case "$name" in
-                *AnyKernel3.zip|AK3_*.zip) asset_type="AnyKernel3 kernel package" ;;
+                *AnyKernel3*.zip|AK3_*.zip) asset_type="AnyKernel3 kernel package" ;;
                 *.apk) asset_type="ZSU manager APK" ;;
                 *.img) asset_type="Kernel image" ;;
                 *.ko) asset_type="Kernel module" ;;
