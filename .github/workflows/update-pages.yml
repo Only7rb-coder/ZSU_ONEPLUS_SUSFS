@@ -29,8 +29,19 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       data-changed: ${{ steps.commit.outputs.changed }}
+      website-present: ${{ steps.website.outputs.present }}
     steps:
       - uses: actions/checkout@v6
+
+      - name: Detect website source
+        id: website
+        run: |
+          if [ -d web ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No web/ directory exists on main; Pages deployment will be skipped."
+          fi
 
       - uses: actions/setup-python@v5
         with:
@@ -62,7 +73,7 @@ jobs:
           fi
 
   deploy-pages:
-    if: ${{ github.repository == 'Only7rb-coder/ZSU_ONEPLUS_SUSFS' }}
+    if: ${{ github.repository == 'Only7rb-coder/ZSU_ONEPLUS_SUSFS' && needs.update-data.outputs.website-present == 'true' }}
     needs: update-data
     runs-on: ubuntu-latest
     environment:
@@ -71,10 +82,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: dev
+          ref: main
 
       - name: Pull latest data
-        run: git pull origin dev
+        run: git pull origin main
 
       - name: Copy data to web directory
         run: cp -r data/ web/data/
